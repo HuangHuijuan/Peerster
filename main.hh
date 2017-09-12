@@ -6,6 +6,20 @@
 #include <QLineEdit>
 #include <QUdpSocket>
 
+class NetSocket : public QUdpSocket
+{
+	Q_OBJECT
+
+public:
+	NetSocket();
+	// Bind this socket to a Peerster-specific default port.
+	bool bind();
+	int getMyPortMin();
+	int getMyPortMax();
+private:
+	int myPortMin, myPortMax;
+};
+
 class ChatDialog : public QDialog
 {
 	Q_OBJECT
@@ -15,24 +29,19 @@ public:
 
 public slots:
 	void gotReturnPressed();
+	void readPendingDatagrams();
 
+protected:
+	bool eventFilter(QObject *obj, QEvent *e);
+	
 private:
 	QTextEdit *textview;
-	QLineEdit *textline;
+	QTextEdit *textline;
+	NetSocket sock;
+	//send data to each port
+	void sendData(const QString& s);
 };
 
-class NetSocket : public QUdpSocket
-{
-	Q_OBJECT
 
-public:
-	NetSocket();
-
-	// Bind this socket to a Peerster-specific default port.
-	bool bind();
-
-private:
-	int myPortMin, myPortMax;
-};
 
 #endif // PEERSTER_MAIN_HH
