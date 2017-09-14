@@ -51,8 +51,10 @@ ChatDialog::ChatDialog()
     seqNo = 1;
     hostName = QHostInfo::localHostName() + QString::number(sock.getPort());
     timer.setInterval(2000);
+    aaTimer.setInterval(10000);
+    aaTimer.start();
     connect(&timer, SIGNAL(timeout()), this, SLOT(sendRumorMsg()));
-
+    connect(&aaTimer, SIGNAL(timeout()), this, SLOT(aESendStatusMsg()));
     //initalize statusMsg
     statusMsg.insert("Want", QVariant(QVariantMap()));
 }
@@ -135,6 +137,10 @@ void ChatDialog::sendStatusMsg(const QHostAddress& host, const quint16 desPort)
     sock.writeDatagram(datagram, host, desPort);
 }
 
+void ChatDialog::aESendStatusMsg() {
+    qDebug() << "Anti-entropy starts";
+    sendStatusMsg(QHostAddress(QHostAddress::LocalHost), getNeighborPort());
+}
 void ChatDialog::readPendingDatagrams()
 {
 	while (sock.hasPendingDatagrams()) {
@@ -192,10 +198,10 @@ void ChatDialog::processStatusMsg(QVariantMap senderStatusMsg, const QHostAddres
     QVariantMap::Iterator itr;
     QVariantMap status = statusMsg["Want"].toMap();
     QVariantMap senderStatus = senderStatusMsg["Want"].toMap();
-    qDebug() << "My Status:";
+    //qDebug() << "My Status:";
     for (itr = status.begin(); itr != status.end(); itr++) {
         QString origin = itr.key();
-        qDebug() << origin << status[origin].toInt();
+     //  qDebug() << origin << status[origin].toInt();
         if (senderStatus.contains(origin)) {
             int senderSeqNo = senderStatus[origin].toInt();
             int statusSeqNo = status[origin].toInt();
@@ -221,9 +227,9 @@ void ChatDialog::processStatusMsg(QVariantMap senderStatusMsg, const QHostAddres
             return;
         }
     }
-    qDebug() << "Sender status:";
+    //qDebug() << "Sender status:";
     for (itr = senderStatus.begin(); itr != senderStatus.end(); itr++) {
-        qDebug() << itr.key() << senderStatus[itr.key()].toInt();
+     //   qDebug() << itr.key() << senderStatus[itr.key()].toInt();
         if (!status.contains(itr.key())) {
             sendStatusMsg(sender, senderPort);
             return;

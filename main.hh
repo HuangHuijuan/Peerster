@@ -39,6 +39,7 @@ public slots:
 	void gotReturnPressed();
     void readPendingDatagrams();
     void sendRumorMsg();
+    void aESendStatusMsg();
 
 protected:
 	bool eventFilter(QObject *obj, QEvent *e);
@@ -52,8 +53,8 @@ private:
     QVariantMap curRumor;
     QVariantMap msgRepo;
     QTimer timer;
+    QTimer aaTimer;
     quint16 receiverPort;
-
 
     int seqNo;
 	//send data to each port
