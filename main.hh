@@ -5,6 +5,8 @@
 #include <QTextEdit>
 #include <QLineEdit>
 #include <QUdpSocket>
+#include <QVector>
+#include <QTimer>
 
 class NetSocket : public QUdpSocket
 {
@@ -16,8 +18,14 @@ public:
 	bool bind();
 	int getMyPortMin();
 	int getMyPortMax();
+    int getPort();
+
+    QVector<int> getNeighbors();
+
 private:
 	int myPortMin, myPortMax;
+    QVector<int> neighbors;
+    int port;
 };
 
 class ChatDialog : public QDialog
@@ -29,7 +37,8 @@ public:
 
 public slots:
 	void gotReturnPressed();
-	void readPendingDatagrams();
+    void readPendingDatagrams();
+    void sendRumorMsg();
 
 protected:
 	bool eventFilter(QObject *obj, QEvent *e);
@@ -38,8 +47,23 @@ private:
 	QTextEdit *textview;
 	QTextEdit *textline;
 	NetSocket sock;
+    QString hostName;
+    QVariantMap statusMsg;
+    QVariantMap curRumor;
+    QVariantMap msgRepo;
+    QTimer timer;
+    quint16 receiverPort;
+
+
+    int seqNo;
 	//send data to each port
-	void sendData(const QString& s);
+    void addStatus(const QString& origin, const quint32 seqNo);
+    void sendStatusMsg(const QHostAddress& host, const quint16 desPor);
+    int getNeighborPort();
+    int getNeighborPortSize();
+    void processRumorMsg(QVariantMap rumorMsg, const QHostAddress& sender, const quint16 senderPort);
+    void processStatusMsg(QVariantMap senderStatusMsg, const QHostAddress& sender, const quint16 senderPort);
+    void continueRumormongering(quint16 senderPort);
 };
 
 
