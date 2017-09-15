@@ -1,23 +1,38 @@
-
-#include <unistd.h>
 #include <QVBoxLayout>
 #include <QApplication>
 #include <QDebug>
 #include <QKeyEvent>
-#include <QVariantMap>
-#include <QHostInfo>
 #include <QVector>
-#include <QTimer>
+#include <QFormLayout>
 #include "main.hh"
+#include "netsocket.h"
+#include "peer.h"
 
 ChatDialog::ChatDialog()
 {
-
 	setWindowTitle("Peerster");
+
+    label = new QLabel("hostname:port/ipaddr:port :", this);
+    peerInfo = new QLineEdit(this);
+    addButton = new QPushButton("Add Peer",this);
+
+    peerLabel = new QLabel("Peers:");
+    peersList = new QTextEdit(this);
+    peersList->setReadOnly(true);
+    peersList->setMinimumWidth(50);
+    peersList->setMaximumWidth(200);
+
+//    QFormLayout *formLayout = new QFormLayout();
+//    formLayout->setFormAlignment(Qt::AlignLeft);
+//    formLayout->setFieldGrowthPolicy(QFormLayout::ExpandingFieldsGrow);
+//    formLayout->addRow(label1, host);
+//    formLayout->addRow(label2, port);
 
 	// Read-only text box where we display messages from everyone.
 	// This widget expands both horizontally and vertically.
 	textview = new QTextEdit(this);
+    textview->setMinimumWidth(80);
+    textview->setMinimumHeight(100);
 	textview->setReadOnly(true);
 
 	// Small text-entry box the user can enter messages.
@@ -28,14 +43,29 @@ ChatDialog::ChatDialog()
 	// so that the user can easily enter multi-line messages.
 	textline = new QTextEdit(this);
 	textline->setFocus();
+    textline->setMinimumWidth(80);
+    textline->setMinimumHeight(30);
+    textline->setMaximumHeight(100);
 	textline->installEventFilter(this);
 	// Lay out the widgets to appear in the main window.
 	// For Qt widget and layout concepts see:
 	// http://doc.qt.nokia.com/4.7-snapshot/widgets-and-layouts.html
-	QVBoxLayout *layout = new QVBoxLayout();
-	layout->addWidget(textview);
-	layout->addWidget(textline);
-	setLayout(layout);
+    QVBoxLayout *layout1 = new QVBoxLayout();
+ //   layout->addLayout(formLayout);
+    layout1->addWidget(label);
+    layout1->addWidget(peerInfo);
+    layout1->addWidget(addButton);
+    layout1->addWidget(textview);
+    layout1->addWidget(textline);
+
+    QVBoxLayout *layout2 = new QVBoxLayout();
+    layout2->addWidget(peerLabel);
+    layout2->addWidget(peersList);
+
+    QHBoxLayout *globalLayout = new QHBoxLayout();
+    globalLayout->addLayout(layout1);
+    globalLayout->addLayout(layout2);
+    setLayout(globalLayout);
 
 	// Create a UDP network socket
 	if (!sock.bind())
@@ -49,14 +79,70 @@ ChatDialog::ChatDialog()
 
     //initialize the seqNo to be 1;
     seqNo = 1;
-    hostName = QHostInfo::localHostName() + QString::number(sock.getPort());
+    hostName = QHostInfo::localHostName() + ":" + QString::number(sock.getPort());
     timer.setInterval(2000);
-    aaTimer.setInterval(10000);
-    aaTimer.start();
+    aETimer.setInterval(10000);
+    aETimer.start();
     connect(&timer, SIGNAL(timeout()), this, SLOT(sendRumorMsg()));
-    connect(&aaTimer, SIGNAL(timeout()), this, SLOT(aESendStatusMsg()));
+    connect(&aETimer, SIGNAL(timeout()), this, SLOT(aESendStatusMsg()));
+    connect(addButton, SIGNAL(clicked()), this, SLOT(addPeer()));
     //initalize statusMsg
     statusMsg.insert("Want", QVariant(QVariantMap()));
+    initializeNeighbors();
+}
+
+void ChatDialog::initializeNeighbors()
+{
+    QHostInfo info=QHostInfo::fromName(QHostInfo::localHostName());
+    QHostAddress myAddress=info.addresses().first();
+    qDebug() << myAddress.toString() << info.hostName();
+    Peer *peer;
+    for (int p = sock.getMyPortMin(); p <= sock.getMyPortMax(); p++) {
+        if (p == sock.getPort()) {
+            continue;
+        }
+        peer = new Peer(p, myAddress, info.hostName());
+        peers.insert(peer->toString(), peer);
+        peersList->append(peer->toString());
+    }
+    //add host from command line to peer
+    QStringList arguments = QCoreApplication::arguments();
+    for (int i = 1; i < arguments.size(); i++) {
+        QStringList list = arguments[i].split(":");
+        int id = QHostInfo::lookupHost(list[0], this, SLOT(lookedUp(QHostInfo)));
+        lookUp.insert(QString::number(id), list[1].toInt());
+    }
+}
+void ChatDialog::addPeer()
+{
+    QStringList list = peerInfo->text().split(":");
+    QString host = list[0];
+    QString port = list[1];
+    peerInfo->clear();
+//    QHostAddress ip = QHostAddress(host);
+//    if (ip.isNull()) {//host is a hostname
+    int id = QHostInfo::lookupHost(host, this, SLOT(lookedUp(QHostInfo)));
+    lookUp.insert(QString::number(id), port.toInt());
+}
+
+void ChatDialog::lookedUp(const QHostInfo &host)
+{
+    if (host.error() != QHostInfo::NoError) {
+        qDebug() << "Lookup failed:" << host.errorString();
+        return;
+    }
+    QString lookUpId = QString::number(host.lookupId());
+    int port = lookUp[lookUpId];
+    QHostAddress address = host.addresses().first();
+    QString hostName = host.hostName();
+    Peer *p = new Peer(port, address, hostName);
+    QString s = p->toString();
+    if (!peers.contains(s)) {
+        peers.insert(s, p);
+        peersList->append(s);
+        qDebug() << "Add peer:" << hostName << address.toString() << port;
+    }
+    lookUp.remove(lookUpId);
 }
 
 void ChatDialog::gotReturnPressed()
@@ -70,7 +156,9 @@ void ChatDialog::gotReturnPressed()
     msg.insert("Origin", hostName);
     msg.insert("SeqNo", seqNo);
     curRumor = msg;
-    receiverPort = getNeighborPort();
+    Peer *neighbor = getNeighbor();
+    receiverIP = neighbor->getAddress();
+    receiverPort = neighbor->getPort();
     if (!timer.isActive()) {
         sendRumorMsg();
     }
@@ -83,15 +171,18 @@ void ChatDialog::gotReturnPressed()
 	textline->clear();
 }
 
-int ChatDialog::getNeighborPort() {
-    QVector<int> neighbors = sock.getNeighbors();
-    int r = qrand() % neighbors.size();
-    return neighbors[r];//randomly choose a neighbor to send the message
+Peer* ChatDialog::getNeighbor()
+{
+    qDebug() << peers.size();
+    int r = qrand() % peers.size();
+    QMap<QString,Peer*>::iterator i = peers.begin();
+    Peer *p = (i + r).value();
+    return p;
 }
 
-int ChatDialog::getNeighborPortSize() {
-    QVector<int> neighbors = sock.getNeighbors();
-    return neighbors.size();
+int ChatDialog::getNeighborSize()
+{
+    return peers.size();
 }
 
 bool ChatDialog::eventFilter(QObject *target, QEvent *e)
@@ -112,15 +203,15 @@ void ChatDialog::sendRumorMsg()
 {
 	QByteArray datagram;
 	QDataStream out(&datagram, QIODevice::WriteOnly);
-    qDebug() << "send rumor message to " <<  receiverPort << ":" << curRumor["ChatText"].toString();
+    qDebug() << "send rumor message to " << receiverIP << ":" <<receiverPort << curRumor["ChatText"].toString();
     out << curRumor;
-    sock.writeDatagram(datagram, QHostAddress::LocalHost, receiverPort);
+    sock.writeDatagram(datagram, receiverIP, receiverPort);
 
     //wait for responding status massage, timer start
     timer.start();
 }
 
-void ChatDialog::addStatus(const QString& origin, const quint32 n)
+void ChatDialog::addStatus(const QString& origin, int n)
 {
     QVariantMap map = statusMsg["Want"].toMap();
     map.insert(origin, QVariant(n + 1));
@@ -128,27 +219,34 @@ void ChatDialog::addStatus(const QString& origin, const quint32 n)
    // qDebug() << origin << qvariant_cast<QVariantMap>(statusMsg["Want"])[origin].toString();
 }
 
-void ChatDialog::sendStatusMsg(const QHostAddress& host, const quint16 desPort)
+void ChatDialog::sendStatusMsg(const QHostAddress desAddr, quint16 desPort)
 {
-    qDebug() << "send status message to" << desPort;
+    qDebug() << "send status message to" << desAddr.toString() << ":" << desPort;
     QByteArray datagram;
     QDataStream out(&datagram, QIODevice::WriteOnly);
     out << statusMsg;
-    sock.writeDatagram(datagram, host, desPort);
+    sock.writeDatagram(datagram, desAddr, desPort);
 }
 
-void ChatDialog::aESendStatusMsg() {
+void ChatDialog::aESendStatusMsg()
+{
     qDebug() << "Anti-entropy starts";
-    sendStatusMsg(QHostAddress(QHostAddress::LocalHost), getNeighborPort());
+    Peer *neighbor = getNeighbor();
+    sendStatusMsg(neighbor->getAddress(), neighbor->getPort());
 }
 void ChatDialog::readPendingDatagrams()
 {
+    qDebug() << "RECEIVE MSG";
 	while (sock.hasPendingDatagrams()) {
 		QByteArray datagram;
 		datagram.resize(sock.pendingDatagramSize());
 		QHostAddress sender;
 		quint16 senderPort;
 		sock.readDatagram(datagram.data(), datagram.size(), &sender, &senderPort);
+        if (!peers.contains(sender.toString() + ":" + senderPort)) {
+            int id = QHostInfo::lookupHost(sender.toString(), this, SLOT(lookedUp(QHostInfo)));
+            lookUp.insert(QString::number(id), senderPort);
+        }
 		QDataStream in(&datagram, QIODevice::ReadOnly);
         QVariantMap msg;
         in >> msg;
@@ -160,9 +258,10 @@ void ChatDialog::readPendingDatagrams()
 	}
 }
 
-void ChatDialog::processRumorMsg(QVariantMap rumorMsg, const QHostAddress& sender, const quint16 senderPort)
+void ChatDialog::processRumorMsg(QVariantMap rumorMsg, const QHostAddress& sender, quint16 senderPort)
 {
-    qDebug() << "RUMOR: receive rumor message from " << senderPort << ": " << rumorMsg["ChatText"].toString() << "--->" << rumorMsg["Origin"].toString() << rumorMsg["SeqNo"].toString();
+    QString senderName = sender.toString() + ":" + QString::number(senderPort);
+    qDebug() << "RUMOR: receive rumor message from " << senderName << ": " << rumorMsg["ChatText"].toString() << "--->" << rumorMsg["Origin"].toString() << rumorMsg["SeqNo"].toString();
     int n = rumorMsg["SeqNo"].toInt();
     QString origin = rumorMsg["Origin"].toString();
     QVariantMap map = statusMsg["Want"].toMap();
@@ -175,23 +274,27 @@ void ChatDialog::processRumorMsg(QVariantMap rumorMsg, const QHostAddress& sende
         addStatus(origin, n);
         //send the new rumor to its neighbour
         curRumor = rumorMsg;
-        continueRumormongering(senderPort);
+        continueRumormongering(senderName);
     }
     sendStatusMsg(sender, senderPort);
 }
 
-void ChatDialog::continueRumormongering(quint16 senderPort) {
+void ChatDialog::continueRumormongering(const QString& senderName) {
+    Peer *receiver;
     do {
-        receiverPort = getNeighborPort();
-    } while (receiverPort == senderPort && getNeighborPortSize() > 1);
+        receiver = getNeighbor();
+    } while (receiver->toString() == senderName && getNeighborSize() > 1);
 
-    if (receiverPort != senderPort && !timer.isActive()) {
+    if (receiver->toString() != senderName && !timer.isActive()) {
+        receiverIP = receiver->getAddress();
+        receiverPort = receiver->getPort();
         sendRumorMsg();
     }
 }
 
-void ChatDialog::processStatusMsg(QVariantMap senderStatusMsg, const QHostAddress& sender, const quint16 senderPort) {
-    qDebug() << "STATUS: receive status message from" << senderPort;
+void ChatDialog::processStatusMsg(QVariantMap senderStatusMsg, const QHostAddress& sender, quint16 senderPort) {
+    QString senderName = sender.toString() + ":" + QString::number(senderPort);
+    qDebug() << "STATUS: receive status message from" << senderName;
 
     timer.stop();
 
@@ -213,6 +316,7 @@ void ChatDialog::processStatusMsg(QVariantMap senderStatusMsg, const QHostAddres
                 //send the corresponding rumor msg
                 curRumor = msgRepo[origin + "_" + QString::number(senderSeqNo)].toMap();
                 receiverPort = senderPort;
+                receiverIP = sender;
                 if (!timer.isActive()) {
                     sendRumorMsg();
                 }
@@ -220,6 +324,7 @@ void ChatDialog::processStatusMsg(QVariantMap senderStatusMsg, const QHostAddres
             }
         } else {
             curRumor = msgRepo[origin + "_1"].toMap();
+            receiverIP = sender;
             receiverPort = senderPort;
             if (!timer.isActive()) {
                 sendRumorMsg();
@@ -238,59 +343,10 @@ void ChatDialog::processStatusMsg(QVariantMap senderStatusMsg, const QHostAddres
 
     if (qrand() % 2) {
         //1, head, send rumor
-        continueRumormongering(senderPort);
+        continueRumormongering(senderName);
     }
 }
 
-NetSocket::NetSocket()
-{
-	// Pick a range of four UDP ports to try to allocate by default,
-	// computed based on my Unix user ID.
-	// This makes it trivial for up to four Peerster instances per user
-	// to find each other on the same host,
-	// barring UDP port conflicts with other applications
-	// (which are quite possible).
-	// We use the range from 32768 to 49151 for this purpose.
-	myPortMin = 32768 + (getuid() % 4096)*4;
-	myPortMax = myPortMin + 3;
-
-}
-
-bool NetSocket::bind()
-{
-	// Try to bind to each of the range myPortMin..myPortMax in turn.
-	for (int p = myPortMin; p <= myPortMax; p++) {
-		if (QUdpSocket::bind(p)) {
-            port = p;
-			qDebug() << "bound to UDP port " << p;
-            if (p + 1 <= myPortMax) {
-                neighbors.append(p + 1);
-            }
-            if (p - 1 >= myPortMin) {
-                neighbors.append(p - 1);
-            }
-			return true;
-		}
-	}
-
-	qDebug() << "Oops, no ports in my default range " << myPortMin
-		<< "-" << myPortMax << " available";
-	return false;
-}
-
-int NetSocket::getMyPortMin() {
-	return myPortMin;
-}
-
-int NetSocket::getMyPortMax() {
-	return myPortMax;
-}
-int NetSocket::getPort() {
-    return port;
-}
-QVector<int> NetSocket::getNeighbors() {
-    return neighbors;
-}
 
 int main(int argc, char **argv)
 {
