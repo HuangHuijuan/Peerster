@@ -19,8 +19,8 @@ ChatDialog::ChatDialog()
     peerLabel = new QLabel("Peers:");
     peersList = new QTextEdit(this);
     peersList->setReadOnly(true);
-    peersList->setMinimumWidth(50);
-    peersList->setMaximumWidth(200);
+//    peersList->setMinimumWidth(50);
+//    peersList->setMaximumWidth(200);
 
 //    QFormLayout *formLayout = new QFormLayout();
 //    formLayout->setFormAlignment(Qt::AlignLeft);
@@ -31,8 +31,7 @@ ChatDialog::ChatDialog()
 	// Read-only text box where we display messages from everyone.
 	// This widget expands both horizontally and vertically.
 	textview = new QTextEdit(this);
-    textview->setMinimumWidth(80);
-    textview->setMinimumHeight(100);
+    textview->setMinimumHeight(300);
 	textview->setReadOnly(true);
 
 	// Small text-entry box the user can enter messages.
@@ -43,8 +42,7 @@ ChatDialog::ChatDialog()
 	// so that the user can easily enter multi-line messages.
 	textline = new QTextEdit(this);
 	textline->setFocus();
-    textline->setMinimumWidth(80);
-    textline->setMinimumHeight(30);
+    textline->setMinimumHeight(50);
     textline->setMaximumHeight(100);
 	textline->installEventFilter(this);
 	// Lay out the widgets to appear in the main window.
@@ -52,13 +50,14 @@ ChatDialog::ChatDialog()
 	// http://doc.qt.nokia.com/4.7-snapshot/widgets-and-layouts.html
     QVBoxLayout *layout1 = new QVBoxLayout();
  //   layout->addLayout(formLayout);
-    layout1->addWidget(label);
-    layout1->addWidget(peerInfo);
-    layout1->addWidget(addButton);
+
     layout1->addWidget(textview);
     layout1->addWidget(textline);
 
     QVBoxLayout *layout2 = new QVBoxLayout();
+    layout2->addWidget(label);
+    layout2->addWidget(peerInfo);
+    layout2->addWidget(addButton);
     layout2->addWidget(peerLabel);
     layout2->addWidget(peersList);
 
