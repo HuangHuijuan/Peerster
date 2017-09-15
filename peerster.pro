@@ -9,5 +9,6 @@ INCLUDEPATH += .
 QT += network
 
 # Input
-HEADERS += main.hh
-SOURCES += main.cc
+HEADERS += main.hh netsocket.h peer.h
+SOURCES += main.cc netsocket.cpp peer.cpp
+
