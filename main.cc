@@ -4,6 +4,7 @@
 #include <QKeyEvent>
 #include <QVector>
 #include <QFormLayout>
+#include <QDateTime>
 #include "main.hh"
 #include "netsocket.h"
 #include "peer.h"
@@ -72,7 +73,8 @@ ChatDialog::ChatDialog()
 
     //initialize the seqNo to be 1;
     seqNo = 1;
-    hostName = QHostInfo::localHostName() + ":" + QString::number(sock.getPort());
+    qsrand(QDateTime::currentMSecsSinceEpoch() / 1000);
+    hostName = QHostInfo::localHostName() + "-" + QString::number(sock.getPort()) + "-" + QString::number(qrand() % 1000);
     timer.setInterval(2000);
     aETimer.setInterval(10000);
     aETimer.start();
