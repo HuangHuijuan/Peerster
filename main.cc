@@ -22,12 +22,6 @@ ChatDialog::ChatDialog()
 //    peersList->setMinimumWidth(50);
 //    peersList->setMaximumWidth(200);
 
-//    QFormLayout *formLayout = new QFormLayout();
-//    formLayout->setFormAlignment(Qt::AlignLeft);
-//    formLayout->setFieldGrowthPolicy(QFormLayout::ExpandingFieldsGrow);
-//    formLayout->addRow(label1, host);
-//    formLayout->addRow(label2, port);
-
 	// Read-only text box where we display messages from everyone.
 	// This widget expands both horizontally and vertically.
 	textview = new QTextEdit(this);
@@ -82,7 +76,7 @@ ChatDialog::ChatDialog()
     timer.setInterval(2000);
     aETimer.setInterval(10000);
     aETimer.start();
-    connect(&timer, SIGNAL(timeout()), this, SLOT(sendRumorMsg()));
+    connect(&timer, SIGNAL(timeout()), this, SLOT(continueRumormongering()));
     connect(&aETimer, SIGNAL(timeout()), this, SLOT(aESendStatusMsg()));
     connect(addButton, SIGNAL(clicked()), this, SLOT(addPeer()));
     //initalize statusMsg
@@ -156,11 +150,7 @@ void ChatDialog::gotReturnPressed()
     msg.insert("SeqNo", seqNo);
     curRumor = msg;
     Peer *neighbor = getNeighbor();
-    receiverIP = neighbor->getAddress();
-    receiverPort = neighbor->getPort();
-    if (!timer.isActive()) {
-        sendRumorMsg();
-    }
+    sendRumorMsg(neighbor->getAddress(), neighbor->getPort());
     addStatus(hostName, seqNo);
     msgRepo.insert(hostName + "_" + QString::number(seqNo), msg);
     seqNo++;
@@ -198,7 +188,7 @@ bool ChatDialog::eventFilter(QObject *target, QEvent *e)
     return QDialog::eventFilter(target, e);
 }
 
-void ChatDialog::sendRumorMsg()
+void ChatDialog::sendRumorMsg(const QHostAddress& receiverIP , quint16 receiverPort)
 {
 	QByteArray datagram;
 	QDataStream out(&datagram, QIODevice::WriteOnly);
@@ -218,7 +208,7 @@ void ChatDialog::addStatus(const QString& origin, int n)
    // qDebug() << origin << qvariant_cast<QVariantMap>(statusMsg["Want"])[origin].toString();
 }
 
-void ChatDialog::sendStatusMsg(const QHostAddress desAddr, quint16 desPort)
+void ChatDialog::sendStatusMsg(const QHostAddress& desAddr, quint16 desPort)
 {
     qDebug() << "send status message to" << desAddr.toString() << ":" << desPort;
     QByteArray datagram;
@@ -273,22 +263,14 @@ void ChatDialog::processRumorMsg(QVariantMap rumorMsg, const QHostAddress& sende
         addStatus(origin, n);
         //send the new rumor to its neighbour
         curRumor = rumorMsg;
-        continueRumormongering(senderName);
+        continueRumormongering();
     }
     sendStatusMsg(sender, senderPort);
 }
 
-void ChatDialog::continueRumormongering(const QString& senderName) {
-    Peer *receiver;
-    do {
-        receiver = getNeighbor();
-    } while (receiver->toString() == senderName && getNeighborSize() > 1);
-
-    if (receiver->toString() != senderName && !timer.isActive()) {
-        receiverIP = receiver->getAddress();
-        receiverPort = receiver->getPort();
-        sendRumorMsg();
-    }
+void ChatDialog::continueRumormongering() {
+    Peer *receiver = getNeighbor();
+    sendRumorMsg(receiver->getAddress(), receiver->getPort());
 }
 
 void ChatDialog::processStatusMsg(QVariantMap senderStatusMsg, const QHostAddress& sender, quint16 senderPort) {
@@ -314,20 +296,12 @@ void ChatDialog::processStatusMsg(QVariantMap senderStatusMsg, const QHostAddres
             } else if (senderSeqNo < statusSeqNo){
                 //send the corresponding rumor msg
                 curRumor = msgRepo[origin + "_" + QString::number(senderSeqNo)].toMap();
-                receiverPort = senderPort;
-                receiverIP = sender;
-                if (!timer.isActive()) {
-                    sendRumorMsg();
-                }
+                sendRumorMsg(sender, senderPort);
                 return;
             }
         } else {
             curRumor = msgRepo[origin + "_1"].toMap();
-            receiverIP = sender;
-            receiverPort = senderPort;
-            if (!timer.isActive()) {
-                sendRumorMsg();
-            }
+            sendRumorMsg(sender, senderPort);
             return;
         }
     }
@@ -342,7 +316,7 @@ void ChatDialog::processStatusMsg(QVariantMap senderStatusMsg, const QHostAddres
 
     if (qrand() % 2) {
         //1, head, send rumor
-        continueRumormongering(senderName);
+        continueRumormongering();
     }
 }
 

@@ -22,7 +22,7 @@ public:
 public slots:
 	void gotReturnPressed();
     void readPendingDatagrams();
-    void sendRumorMsg();
+    void continueRumormongering();
     void aESendStatusMsg();
     void addPeer();
     void lookedUp(const QHostInfo &host);
@@ -47,9 +47,7 @@ private:
     QVariantMap msgRepo;
     QTimer timer;
     QTimer aETimer;
-   // Peer *receiver;
-    QHostAddress receiverIP;
-    quint16 receiverPort;
+   // Peer *receiver
     QMap<QString, Peer*> peers;
     QMap<QString, int> lookUp;
 
@@ -58,13 +56,13 @@ private:
     int seqNo;
 	//send data to each port
     void addStatus(const QString& origin, int seqNo);
-    void sendStatusMsg(const QHostAddress a, quint16 p);
+    void sendStatusMsg(const QHostAddress& a, quint16 p);
     Peer* getNeighbor();
     int getNeighborSize();
     void processRumorMsg(QVariantMap rumorMsg, const QHostAddress& sender, quint16 senderPort);
     void processStatusMsg(QVariantMap senderStatusMsg, const QHostAddress& sender, quint16 senderPort);
-    void continueRumormongering(const QString& senderName);
     void initializeNeighbors();
+    void sendRumorMsg(const QHostAddress& a, quint16 p);
 };
 
 
