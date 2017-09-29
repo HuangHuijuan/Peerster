@@ -48,7 +48,7 @@ public:
     void processPrivateMsg(QVariantMap privateMsg);
     void processRumorMsg(QVariantMap rumorMsg, const QHostAddress& sender, quint16 senderPort);
     void processStatusMsg(QVariantMap senderStatusMsg, const QHostAddress& sender, quint16 senderPort);
-    void initializeNeighbors(QListWidget *peersList);
+    void initializeNeighbors();
     void sendRumorMsg(const QHostAddress& a, quint16 p, const QString& rumorId);
     void addPeer(const QString& host, quint16 port);
     void sendNewMsg(const QString& content);

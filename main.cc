@@ -61,7 +61,6 @@ ChatDialog::ChatDialog()
     mapper = new QSignalMapper();
 
     node = new Node();
-    node->initializeNeighbors(onlinePeers);
 
     connect(addButton, SIGNAL(clicked()), this, SLOT(addPeerButtonClicked()));
     connect(node, SIGNAL(newLog(QString)), this, SLOT(appendLog(QString)));
