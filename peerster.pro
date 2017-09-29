@@ -3,12 +3,17 @@
 ######################################################################
 
 TEMPLATE = app
-TARGET = 
+TARGET = peerster
 DEPENDPATH += .
 INCLUDEPATH += .
-QT += network
+QT += widgets network
 
 # Input
-HEADERS += main.hh netsocket.h peer.h
-SOURCES += main.cc netsocket.cpp peer.cpp
-
+HEADERS += main.hh \
+    netsocket.h \
+    peer.h \
+    node.h
+SOURCES += main.cc \
+    netsocket.cpp \
+    peer.cpp \
+    node.cpp
