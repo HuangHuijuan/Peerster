@@ -14,15 +14,13 @@ ChatDialog::ChatDialog()
     peerInfo = new QLineEdit(this);
     addButton = new QPushButton("Add Peer",this);
 
-    //peerListLabel = new QLabel("Peer List:");
-   // peerList = new QTextEdit(this);
- //   peerList->setReadOnly(true);
+//    peerListLabel = new QLabel("Peer List:");
+//    peerList = new QTextEdit(this);
+//    peerList->setReadOnly(true);
 
     peerLabel = new QLabel("Online Peers:");
     onlinePeers = new QListWidget(this);
 
-//    peersList->setMinimumWidth(50);
-//    peersList->setMaximumWidth(200);
 
 	// Read-only text box where we display messages from everyone.
 	// This widget expands both horizontally and vertically.
@@ -42,7 +40,6 @@ ChatDialog::ChatDialog()
 	// For Qt widget and layout concepts see:
 	// http://doc.qt.nokia.com/4.7-snapshot/widgets-and-layouts.html
     QGridLayout *layout1 = new QGridLayout();
- //   layout->addLayout(formLayout);
 
     layout1->addWidget(textview, 0, 0, 2, -1);
     layout1->addWidget(textline, 2, 0, 1, -1);
@@ -95,6 +92,15 @@ void ChatDialog::newDialog(QListWidgetItem* item) {
     connect(sendBtn, SIGNAL(clicked(bool)), mapper, SLOT(map()));
     mapper->setMapping(sendBtn, item->text());
     connect(mapper, SIGNAL(mapped(QString)), this, SLOT(sendBtnClicked(QString)));
+    connect(dialog, SIGNAL(rejected()), mapper, SLOT(map()));
+    mapper->setMapping(dialog, item->text());
+    connect(mapper, SIGNAL(mapped(QString)), this, SLOT(closeDiaglog(QString)));
+}
+
+void ChatDialog::closeDiaglog(const QString& item) {
+    qDebug() << "session with" << item << " has been closed!";
+    peerInputBoxMap.remove(item);
+    peerChatAreaMap.remove(item);
 }
 
 bool ChatDialog::eventFilter(QObject *target, QEvent *e)
@@ -113,6 +119,9 @@ bool ChatDialog::eventFilter(QObject *target, QEvent *e)
 
 void ChatDialog::addPeerButtonClicked()
 {
+    if (peerInfo->text() == "") {
+        return;
+    }
     QStringList list = peerInfo->text().split(":");
     QString host = list[0];
     QString port = list[1];

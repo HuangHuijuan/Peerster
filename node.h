@@ -37,6 +37,7 @@ private:
     QString userName;
     QHash<QString, QPair<QHostAddress, quint16>> routingTable;
     QMap<QString, QTimer*> rumorTimers;
+    bool forward;
 
 public:
     Node();

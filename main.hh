@@ -26,6 +26,7 @@ public slots:
     void newDialog(QListWidgetItem*);
     void sendBtnClicked(const QString& des);
     void receiveNewPrivLog(const QString& origin, const QString& text);
+    void closeDiaglog(const QString& item);
 
 protected:
 	bool eventFilter(QObject *obj, QEvent *e);
@@ -34,8 +35,6 @@ private:
     QLabel *label;
     QLabel *peerLabel;
     QLabel *peerListLabel;
-//    QLineEdit *host;
-//    QLineEdit *port;
     QLineEdit *peerInfo;
     QPushButton *addButton;
 	QTextEdit *textview;

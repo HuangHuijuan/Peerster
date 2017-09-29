@@ -30,6 +30,8 @@ Node::Node()
 
     signalMapper = new QSignalMapper(this);
 
+    forward = true;
+
 }
 
 void Node::initializeNeighbors(QListWidget *peersList)
@@ -50,11 +52,20 @@ void Node::initializeNeighbors(QListWidget *peersList)
 
     //add host from command line to peer
     QStringList arguments = QCoreApplication::arguments();
-    for (int i = 1; i < arguments.size(); i++) {
-        QStringList list = arguments[i].split(":");
-        int id = QHostInfo::lookupHost(list[0], this, SLOT(lookedUp(QHostInfo)));
-        lookUp.insert(QString::number(id), list[1].toInt());
+
+    if (arguments.size() > 1) {
+        int start = 1;
+        if (arguments[1] == "-noforward") {
+            forward = false;
+            start = 2;
+        }
+        for (int i = start; i < arguments.size(); i++) {
+            QStringList list = arguments[i].split(":");
+            int id = QHostInfo::lookupHost(list[0], this, SLOT(lookedUp(QHostInfo)));
+            lookUp.insert(QString::number(id), list[1].toInt());
+        }
     }
+
     //start up
     sendRouteRumor();
 }
@@ -212,7 +223,9 @@ void Node::readPendingDatagrams()
         } else if (msg.contains("Origin")) {
             processRumorMsg(msg, sender, senderPort);
         } else if (msg.contains("Want")) {
-            processStatusMsg(msg, sender, senderPort);
+            if (forward) {
+                processStatusMsg(msg, sender, senderPort);
+            }
         }
     }
 }
@@ -222,7 +235,9 @@ void Node::processPrivateMsg(QVariantMap privateMsg)
     if (privateMsg["Dest"] != userName && privateMsg["HopLimit"].toInt() > 0) {
         QPair<QHostAddress, quint16> pair = routingTable[privateMsg["Dest"].toString()];
         privateMsg.insert("HopLimit", privateMsg["HopLimit"].toInt() - 1);
-        sendMsg(pair.first, pair.second, privateMsg);
+        if (forward) {
+            sendMsg(pair.first, pair.second, privateMsg);
+        }
     } else if (privateMsg["Dest"] == userName) {
         emit newPrivateLog(privateMsg["Origin"].toString(), privateMsg["ChatText"].toString());
     }
@@ -243,8 +258,10 @@ void Node::processRumorMsg(QVariantMap rumorMsg, const QHostAddress& sender, qui
         //add rumor msg to the map
         QString msgId = origin + "_" +QString::number(n);
         msgRepo.insert(msgId, QVariant(rumorMsg));
-        //send the new rumor to its neighbour
-        continueRumormongering(msgId);
+        if (forward) {
+            //send the new rumor to its neighbour
+            continueRumormongering(msgId);
+        }
         addStatus(origin, n);
 
         if (!routingTable.contains(origin)) {
