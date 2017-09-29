@@ -1,16 +1,15 @@
 #ifndef PEERSTER_MAIN_HH
 #define PEERSTER_MAIN_HH
-
+#include <QMap>
 #include <QDialog>
 #include <QTextEdit>
 #include <QLineEdit>
-#include <QTimer>
 #include <QLabel>
 #include <QPushButton>
-#include <QMap>
-#include <QHostInfo>
-#include "peer.h"
-#include "netsocket.h"
+#include <QListWidget>
+#include <QSignalMapper>
+#include "node.h"
+
 
 class ChatDialog : public QDialog
 {
@@ -21,11 +20,12 @@ public:
 
 public slots:
 	void gotReturnPressed();
-    void readPendingDatagrams();
-    void continueRumormongering();
-    void aESendStatusMsg();
-    void addPeer();
-    void lookedUp(const QHostInfo &host);
+    void addPeerButtonClicked();
+    void appendLog(const QString& text);
+    void addPeer(const QString& s);
+    void newDialog(QListWidgetItem*);
+    void sendBtnClicked(const QString& des);
+    void receiveNewPrivLog(const QString& origin, const QString& text);
 
 protected:
 	bool eventFilter(QObject *obj, QEvent *e);
@@ -33,37 +33,22 @@ protected:
 private:
     QLabel *label;
     QLabel *peerLabel;
+    QLabel *peerListLabel;
 //    QLineEdit *host;
 //    QLineEdit *port;
     QLineEdit *peerInfo;
     QPushButton *addButton;
 	QTextEdit *textview;
 	QTextEdit *textline;
-    QTextEdit *peersList;
-	NetSocket sock;
-    QString hostName;
-    QVariantMap statusMsg;
-    QVariantMap curRumor;
-    QVariantMap msgRepo;
-    QTimer timer;
-    QTimer aETimer;
-   // Peer *receiver
-    QMap<QString, Peer*> peers;
-    QMap<QString, int> lookUp;
-
-    //std::map<std::string, Peer> peers;
-
-    int seqNo;
-	//send data to each port
-    void addStatus(const QString& origin, int seqNo);
-    void sendStatusMsg(const QHostAddress& a, quint16 p);
-    Peer* getNeighbor();
-    int getNeighborSize();
-    void processRumorMsg(QVariantMap rumorMsg, const QHostAddress& sender, quint16 senderPort);
-    void processStatusMsg(QVariantMap senderStatusMsg, const QHostAddress& sender, quint16 senderPort);
-    void initializeNeighbors();
-    void sendRumorMsg(const QHostAddress& a, quint16 p);
+    QTextEdit *peerList;
+    QListWidget *onlinePeers;
+    Node *node;
+    QSignalMapper *mapper;
+    QMap<QString, QTextEdit*> peerInputBoxMap;
+    QMap<QString, QTextEdit*> peerChatAreaMap;
 };
+
+
 
 
 
