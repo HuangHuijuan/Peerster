@@ -12,8 +12,10 @@ QT += widgets network
 HEADERS += main.hh \
     netsocket.h \
     peer.h \
-    node.h
+    node.h \
+    p2pchatdialog.h
 SOURCES += main.cc \
     netsocket.cpp \
     peer.cpp \
-    node.cpp
+    node.cpp \
+    p2pchatdialog.cpp

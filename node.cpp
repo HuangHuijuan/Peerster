@@ -156,10 +156,6 @@ void Node::sendP2PMsg(const QString& des, const QString& chatText)
     msg.insert("HopLimit", 10);
 
     QPair<QHostAddress, quint16> pair = routingTable[des];
-//    QString peerId = pair.first + ":" + QString::number(pair.second);
-//    if (peers.contains(peerId)) {
-//        Peer *peer = peers[peerId];
-//    }
     sendMsg(pair.first, pair.second, msg);
 }
 
@@ -240,9 +236,10 @@ void Node::readPendingDatagrams()
 void Node::processPrivateMsg(QVariantMap privateMsg)
 {
     qDebug() << "PRIV: receive private msg";
+
     if (privateMsg["Dest"] != userName && privateMsg["HopLimit"].toInt() > 0) {
         QPair<QHostAddress, quint16> pair = routingTable[privateMsg["Dest"].toString()];
-        privateMsg.insert("HopLimit", privateMsg["HopLimit"].toInt() - 1);
+        privateMsg["HopLimit"] = privateMsg["HopLimit"].toInt() - 1;
         if (forward) {
             sendMsg(pair.first, pair.second, privateMsg);
         }

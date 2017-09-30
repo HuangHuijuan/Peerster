@@ -4,6 +4,7 @@
 #include <QKeyEvent>
 #include <QVector>
 #include <QFormLayout>
+#include "p2pchatdialog.h"
 #include "main.hh"
 
 ChatDialog::ChatDialog()
@@ -69,37 +70,17 @@ ChatDialog::ChatDialog()
     connect(node, SIGNAL(newPrivateLog(QString,QString)), this, SLOT(receiveNewPrivLog(QString, QString)));
 }
 
+
 void ChatDialog::newDialog(QListWidgetItem* item) {
-    qDebug() << "Item selected: " << item->text();
-    QDialog* dialog = new QDialog(this);
-   // dialog->setMinimumSize(300, 400);
-    QTextEdit* chatBox = new QTextEdit(dialog);
-    chatBox->setReadOnly(true);
-    QTextEdit* inputBox = new QTextEdit(dialog);
-    inputBox->installEventFilter(this);
-    QPushButton* sendBtn = new QPushButton("Send", dialog);
-    QGridLayout* gl = new QGridLayout();
-    gl->addWidget(chatBox, 0, 0, 2, -1);
-    gl->addWidget(inputBox,2, 0, 1, -1);
-    gl->addWidget(sendBtn, 3, 0, 1, -1);
-    gl->setRowStretch(1, 200);
-    gl->setRowStretch(2, 100);
-    dialog->setLayout(gl);
-    dialog->show();
-    peerInputBoxMap.insert(item->text(), inputBox);
-    peerChatAreaMap.insert(item->text(), chatBox);
-    connect(sendBtn, SIGNAL(clicked(bool)), mapper, SLOT(map()));
-    mapper->setMapping(sendBtn, item->text());
-    connect(mapper, SIGNAL(mapped(QString)), this, SLOT(sendBtnClicked(QString)));
-    connect(dialog, SIGNAL(rejected()), mapper, SLOT(map()));
-    mapper->setMapping(dialog, item->text());
-    connect(mapper, SIGNAL(mapped(QString)), this, SLOT(closeDiaglog(QString)));
+    P2PChatDialog *p2pDialog = new P2PChatDialog(item->text());
+    p2pDialog->show();
+    peerDialogMap.insert(item->text(), p2pDialog);
+    connect(p2pDialog, SIGNAL(returnPressed(QString, QString)), this, SLOT(sendPrivMsg(QString, QString)));
+    connect(p2pDialog, SIGNAL(dialogClosed(QString)), SLOT(p2pdialogClosed(QString)));
 }
 
-void ChatDialog::closeDiaglog(const QString& item) {
-    qDebug() << "session with" << item << " has been closed!";
-    peerInputBoxMap.remove(item);
-    peerChatAreaMap.remove(item);
+void ChatDialog::p2pdialogClosed(const QString& item) {
+    peerDialogMap.remove(item);
 }
 
 bool ChatDialog::eventFilter(QObject *target, QEvent *e)
@@ -142,15 +123,10 @@ void ChatDialog::gotReturnPressed()
 	textline->clear();
 }
 
-void ChatDialog::sendBtnClicked(const QString& des)
-{
-    QTextEdit* inputBox =  peerInputBoxMap[des];
-    QTextEdit* chatBox = peerChatAreaMap[des];
-    QString content = inputBox->toPlainText();
-    inputBox->clear();
-    chatBox->append(node->getUserName() + ": " + content);
+void ChatDialog::sendPrivMsg(const QString& des, const QString& content) {
     node->sendP2PMsg(des, content);
 }
+
 
 void ChatDialog::appendLog(const QString& text)
 {
@@ -159,19 +135,20 @@ void ChatDialog::appendLog(const QString& text)
 
 void ChatDialog::receiveNewPrivLog(const QString& origin, const QString& text)
 {
-    if (!peerChatAreaMap.contains(origin)) {
-        QListWidgetItem* item = onlinePeers->findItems(origin, Qt::MatchExactly)[0];
-        newDialog(item);
+    if (!peerDialogMap.contains(origin)) {
+        QList<QListWidgetItem*> items = onlinePeers->findItems(origin, Qt::MatchExactly);
+        if (items.size() == 0) {
+            return;
+        }
+        newDialog(items[0]);
     }
-    peerChatAreaMap[origin]->append(origin + ": " + text);
+    peerDialogMap[origin]->chatBox->append(origin + ": " + text);
 }
 
 void ChatDialog::addPeer(const QString& s)
 {
     onlinePeers->addItem(s);
 }
-
-
 
 int main(int argc, char **argv)
 {

@@ -9,7 +9,7 @@
 #include <QListWidget>
 #include <QSignalMapper>
 #include "node.h"
-
+#include "p2pchatdialog.h"
 
 class ChatDialog : public QDialog
 {
@@ -24,9 +24,9 @@ public slots:
     void appendLog(const QString& text);
     void addPeer(const QString& s);
     void newDialog(QListWidgetItem*);
-    void sendBtnClicked(const QString& des);
+    void sendPrivMsg(const QString& des, const QString& content);
     void receiveNewPrivLog(const QString& origin, const QString& text);
-    void closeDiaglog(const QString& item);
+    void p2pdialogClosed(const QString& item);
 
 protected:
 	bool eventFilter(QObject *obj, QEvent *e);
@@ -43,8 +43,7 @@ private:
     QListWidget *onlinePeers;
     Node *node;
     QSignalMapper *mapper;
-    QMap<QString, QTextEdit*> peerInputBoxMap;
-    QMap<QString, QTextEdit*> peerChatAreaMap;
+    QMap<QString, P2PChatDialog*> peerDialogMap;
 };
 
 
