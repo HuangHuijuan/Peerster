@@ -37,6 +37,7 @@ private:
     QString userName;
     QHash<QString, QPair<QHostAddress, quint16>> routingTable;
     QMap<QString, QTimer*> rumorTimers;
+    QMap<QString, bool> ifDirectMsg;
     bool forward;
 
 public:
@@ -56,7 +57,7 @@ public:
     QSignalMapper* signalMapper;
     QString& getUserName();
     void sendMsg(const QHostAddress& receiverIP , quint16 receiverPort, const QVariantMap& msg);
-
+    void sendMsgToAllPeers(const QVariantMap& msg);
 
 };
 #endif // NODE_H

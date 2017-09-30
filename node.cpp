@@ -173,7 +173,6 @@ void Node::sendMsg(const QHostAddress& receiverIP , quint16 receiverPort, const 
 
 void Node::sendRumorMsg(const QHostAddress& receiverIP , quint16 receiverPort, const QString& msgId)
 {
-
     qDebug() << "send rumor message " << msgId << " to " << receiverIP << ":" <<receiverPort;
 
     sendMsg(receiverIP, receiverPort, msgRepo[msgId].toMap());
@@ -268,19 +267,23 @@ void Node::processRumorMsg(QVariantMap rumorMsg, const QHostAddress& sender, qui
     QString origin = rumorMsg["Origin"].toString();
     QVariantMap map = statusMsg["Want"].toMap();
 
+    //new message
     if ((!map.contains(origin) && n == 1)|| (map.contains(origin) && map[origin].toInt() == n)) {
+        QString msgId = origin + "_" +QString::number(n);
         if (rumorMsg.contains("ChatText")) {
             QString senderName = sender.toString() + ":" + QString::number(senderPort);
             qDebug() << "RUMOR: receive chat rumor from " << senderName << ": " << rumorMsg["ChatText"].toString() << "--->" << origin << n;
             emit newLog(origin + ": " + rumorMsg["ChatText"].toString());
+            if (forward) {
+                //send the new rumor to its neighbour
+                continueRumormongering(msgId);
+            }
+        } else { //route rumor message
+            sendMsgToAllPeers(rumorMsg);
         }
         //add rumor msg to the map
-        QString msgId = origin + "_" +QString::number(n);
         msgRepo.insert(msgId, QVariant(rumorMsg));
-        if (forward || !rumorMsg.contains("ChatText")) {
-            //send the new rumor to its neighbour
-            continueRumormongering(msgId);
-        }
+
         addStatus(origin, n);
 
         if (!routingTable.contains(origin)) {
@@ -288,7 +291,16 @@ void Node::processRumorMsg(QVariantMap rumorMsg, const QHostAddress& sender, qui
             qDebug() << "Add peer to routing table:" << origin;
         }
         routingTable.insert(origin, QPair<QHostAddress, quint16>(sender, senderPort));
-
+        if (rumorMsg.contains("LastIP")) {
+            ifDirectMsg.insert(origin, false);
+        } else {
+            ifDirectMsg.insert(origin, true);
+        }
+    } else if ((map.contains(origin) && map[origin].toInt() == n - 1)) {
+        //receive same message multiple time
+        if(!ifDirectMsg[origin] && !rumorMsg.contains("LastIP")) {
+            routingTable.insert(origin, QPair<QHostAddress, quint16>(sender, senderPort));
+        }
     }
     //send status msg to the sender
     sendStatusMsg(sender, senderPort);
@@ -300,7 +312,15 @@ void Node::continueRumormongering(const QString& msgId) {
     sendRumorMsg(receiver->getAddress(), receiver->getPort(), msgId);
 }
 
-void Node::processStatusMsg(QVariantMap senderStatusMsg, const QHostAddress& sender, quint16 senderPort) {
+void Node::sendMsgToAllPeers(const QVariantMap& msg)
+{
+    for (Peer* p: peers.values()) {
+        sendMsg(p->getAddress(), p->getPort(), msg);
+    }
+}
+
+void Node::processStatusMsg(QVariantMap senderStatusMsg, const QHostAddress& sender, quint16 senderPort)
+{
     QString senderName = sender.toString() + ":" + QString::number(senderPort);
     qDebug() << "STATUS: receive status message from" << senderName;
 
