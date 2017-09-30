@@ -37,7 +37,7 @@ private:
     QString userName;
     QHash<QString, QPair<QHostAddress, quint16>> routingTable;
     QMap<QString, QTimer*> rumorTimers;
-    QMap<QString, bool> ifDirectMsg;
+    QHostAddress myAddress;
     bool forward;
 
 public:
