@@ -72,7 +72,7 @@ ChatDialog::ChatDialog()
 
 
 void ChatDialog::newDialog(QListWidgetItem* item) {
-    P2PChatDialog *p2pDialog = new P2PChatDialog(item->text());
+    P2PChatDialog *p2pDialog = new P2PChatDialog(item->text(), node->getUserName());
     p2pDialog->show();
     peerDialogMap.insert(item->text(), p2pDialog);
     connect(p2pDialog, SIGNAL(returnPressed(QString, QString)), this, SLOT(sendPrivMsg(QString, QString)));
@@ -103,6 +103,9 @@ void ChatDialog::addPeerButtonClicked()
         return;
     }
     QStringList list = peerInfo->text().split(":");
+    if (list.length() == 0) {
+        return;
+    }
     QString host = list[0];
     QString port = list[1];
     peerInfo->clear();
@@ -148,6 +151,12 @@ void ChatDialog::receiveNewPrivLog(const QString& origin, const QString& text)
 void ChatDialog::addPeer(const QString& s)
 {
     onlinePeers->addItem(s);
+}
+
+void ChatDialog::closeEvent ( QCloseEvent * event )
+{
+    event->accept();
+    exit(0);
 }
 
 int main(int argc, char **argv)

@@ -28,8 +28,10 @@ public slots:
     void receiveNewPrivLog(const QString& origin, const QString& text);
     void p2pdialogClosed(const QString& item);
 
+
 protected:
 	bool eventFilter(QObject *obj, QEvent *e);
+    void closeEvent ( QCloseEvent * event);
 	
 private:
     QLabel *label;

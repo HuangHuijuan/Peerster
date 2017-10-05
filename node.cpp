@@ -293,15 +293,13 @@ void Node::processRumorMsg(QVariantMap rumorMsg, const QHostAddress& sender, qui
         if (!routingTable.contains(origin)) {
             emit newPeer(origin);
             qDebug() << "Add peer to routing table:" << origin;
+            sendRouteRumor();
         }
         routingTable.insert (origin, QPair<QHostAddress, quint16>(sender, senderPort));
         qDebug() << "routingTable insert" << origin << " " << sender;
     } else if (map.contains(origin) && map[origin].toInt() - 1 == n) {
-         qDebug() << "receive same message multiple time from" << sender.toString() << ": " << msgId;
-         qDebug() << rumorMsg.contains("LastIP");
-            //receive same message multiple time
          if(!rumorMsg.contains("LastIP")) {
-             qDebug() << "receive direct msg";
+             qDebug() << "receive direct msg from" << sender.toString() << ": " << msgId;;
              routingTable.insert(origin, QPair<QHostAddress, quint16>(sender, senderPort));
          }
      }

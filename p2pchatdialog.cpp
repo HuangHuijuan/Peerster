@@ -4,7 +4,7 @@
 #include "p2pchatdialog.h"
 
 
-P2PChatDialog::P2PChatDialog(const QString& destination)
+P2PChatDialog::P2PChatDialog(const QString& destination, const QString& host)
 {
     chatBox = new QTextEdit(this);
     chatBox->setReadOnly(true);
@@ -17,6 +17,7 @@ P2PChatDialog::P2PChatDialog(const QString& destination)
     gl->setRowStretch(2, 100);
     this->setLayout(gl);
     this->des = destination;
+    this->host = host;
     this->setWindowTitle("Chat with " + des);
 }
 
@@ -33,7 +34,7 @@ bool P2PChatDialog::eventFilter(QObject *target, QEvent *e)
         if (event->key() == Qt::Key_Return)
         {
             emit returnPressed(des, inputBox->toPlainText());
-            chatBox->append(des + ": " + inputBox->toPlainText());
+            chatBox->append(host + ": " + inputBox->toPlainText());
             inputBox->clear();
             return true;
         }

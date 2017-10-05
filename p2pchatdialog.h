@@ -9,7 +9,7 @@ class P2PChatDialog : public QDialog
     Q_OBJECT
 
 public:
-    P2PChatDialog(const QString& des);
+    P2PChatDialog(const QString& des,  const QString& host);
     QString getDes();
     QTextEdit* chatBox;
     QTextEdit* inputBox;
@@ -24,7 +24,7 @@ protected:
 
 private:
     QString des;
-
+    QString host;
 };
 
 
