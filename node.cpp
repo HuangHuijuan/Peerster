@@ -19,7 +19,6 @@ Node::Node()
 
     aETimer.setInterval(10000);
     rrTimer.setInterval(60000);
-    rrTimer.start();
 
     //initalize statusMsg
     statusMsg.insert("Want", QVariant(QVariantMap()));
@@ -27,7 +26,7 @@ Node::Node()
     connect(&sock, SIGNAL(readyRead()), this, SLOT(readPendingDatagrams()));
     aETimer.start();
     connect(&aETimer, SIGNAL(timeout()), this, SLOT(aESendStatusMsg()));
-
+    rrTimer.start();
     connect(&rrTimer, SIGNAL(timeout()), this, SLOT(sendRouteRumor()));
 
     signalMapper = new QSignalMapper(this);
@@ -39,10 +38,10 @@ Node::Node()
 
 void Node::initializeNeighbors()
 {
-    qDebug() << QHostInfo::localHostName();
     QHostInfo info = QHostInfo::fromName(QHostInfo::localHostName());
     myAddress = info.addresses().first();
-    qDebug() << myAddress.toString() << info.hostName();
+
+    qDebug() << myAddress.toIPv4Address() << myAddress.toString() << info.hostName();
 
     for (int p = sock.getMyPortMin(); p <= sock.getMyPortMax(); p++) {
         if (p == sock.getPort()) {
@@ -80,7 +79,6 @@ void Node::initializeNeighbors()
 
 Peer* Node::getNeighbor()
 {
-    qDebug() << peers.size();
     int r = qrand() % peers.size();
     QMap<QString,Peer*>::iterator i = peers.begin();
     Peer *p = (i + r).value();
@@ -177,7 +175,7 @@ void Node::sendRumorMsg(const QHostAddress& receiverIP , quint16 receiverPort, c
 {
     QVariantMap msg = msgRepo[msgId].toMap();
     if (forward || !msg.contains("ChatText")) {
-        qDebug() << "send rumor message " << msgId << " to " << receiverIP << ":" <<receiverPort;
+     //   qDebug() << "send rumor message " << msgId << " to " << receiverIP << ":" <<receiverPort;
         sendMsg(receiverIP, receiverPort, msg);
     }
 
@@ -204,7 +202,7 @@ void Node::addStatus(const QString& origin, int n)
 
 void Node::sendStatusMsg(const QHostAddress& desAddr, quint16 desPort)
 {
-    qDebug() << "send status message to" << desAddr.toString() << ":" << desPort;
+  //  qDebug() << "send status message to" << desAddr.toString() << ":" << desPort;
     sendMsg(desAddr, desPort, statusMsg);
 }
 
@@ -229,6 +227,7 @@ void Node::readPendingDatagrams()
         QDataStream in(&datagram, QIODevice::ReadOnly);
         QVariantMap msg;
         in >> msg;
+     //   qDebug() << msg;
         if (msg.contains("Dest")) {
             processPrivateMsg(msg);
         } else if (msg.contains("Origin")) {
@@ -255,15 +254,16 @@ void Node::processRumorMsg(QVariantMap rumorMsg, const QHostAddress& sender, qui
 {
     int n = rumorMsg["SeqNo"].toInt();
     QString origin = rumorMsg["Origin"].toString();
-    QString msgId = origin + "_" +QString::number(n);
+    QString msgId = origin + "_" + QString::number(n);
     QVariantMap map = statusMsg["Want"].toMap();
 
     if (rumorMsg.contains("LastIP")) { 
-        QString lastIP = rumorMsg["LastIP"].toString();
+        quint32 lastIP = rumorMsg["LastIP"].toInt();
+        QString address= QHostAddress(lastIP).toString();
         QString lastPort = rumorMsg["lastPort"].toString();
-        QString lastId = lastIP + ":" + lastPort;
-        if (!peers.contains(lastId) && lastIP != myAddress.toString()) {
-            int id = QHostInfo::lookupHost(lastIP, this, SLOT(lookedUp(QHostInfo)));
+        QString lastId = address + ":" + lastPort;
+        if (!peers.contains(lastId) && address != myAddress.toString()) {
+            int id = QHostInfo::lookupHost(address, this, SLOT(lookedUp(QHostInfo)));
             lookUp.insert(QString::number(id), senderPort);
         }
     }
@@ -271,7 +271,13 @@ void Node::processRumorMsg(QVariantMap rumorMsg, const QHostAddress& sender, qui
     //new message
 
     if ((!map.contains(origin) && n == 1)|| (map.contains(origin) && map[origin].toInt() == n)) {
-        rumorMsg.insert("LastIP", sender.toString());
+        QHostAddress sourceIP = sender;
+        quint16 sourcePort = senderPort;
+        if(rumorMsg.count("LastIP") && rumorMsg.count("LastPort")){
+            sourceIP = QHostAddress(rumorMsg["LastIP"].toInt());
+            sourcePort = (quint16)rumorMsg["LastPort"].toInt();
+        }
+        rumorMsg.insert("LastIP", sender.toIPv4Address());
         rumorMsg.insert("LastPort", senderPort);
 
         if (rumorMsg.contains("ChatText")) {
@@ -295,8 +301,9 @@ void Node::processRumorMsg(QVariantMap rumorMsg, const QHostAddress& sender, qui
             qDebug() << "Add peer to routing table:" << origin;
             sendRouteRumor();
         }
-        routingTable.insert (origin, QPair<QHostAddress, quint16>(sender, senderPort));
-        qDebug() << "routingTable insert" << origin << " " << sender;
+        routingTable.insert (origin, QPair<QHostAddress, quint16>(sourceIP, sourcePort));
+        qDebug() << routingTable;
+    //    qDebug() << "routingTable insert" << origin << " " << sender;
     } else if (map.contains(origin) && map[origin].toInt() - 1 == n) {
          if(!rumorMsg.contains("LastIP")) {
              qDebug() << "receive direct msg from" << sender.toString() << ": " << msgId;;
@@ -325,7 +332,7 @@ void Node::sendMsgToAllPeers(const QVariantMap& msg)
 void Node::processStatusMsg(QVariantMap senderStatusMsg, const QHostAddress& sender, quint16 senderPort)
 {
     QString senderName = sender.toString() + ":" + QString::number(senderPort);
-    qDebug() << "STATUS: receive status message from" << senderName;
+//    qDebug() << "STATUS: receive status message from" << senderName;
 
     QVariantMap::Iterator itr;
     QVariantMap status = statusMsg["Want"].toMap();
