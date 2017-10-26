@@ -6,8 +6,11 @@
 #include <QTimer>
 #include <QListWidget>
 #include <QSignalMapper>
+#include <QVector>
+#include <QSet>
 #include "peer.h"
 #include "netsocket.h"
+#include "file.h"
 
 class Node : public QObject {
 
@@ -38,7 +41,13 @@ private:
     QHash<QString, QPair<QHostAddress, quint16>> routingTable;
     QMap<QString, QTimer*> rumorTimers;
     QHostAddress myAddress;
+    QMap<QByteArray, File*> metafiles;
+    QMap<QByteArray, QPair<QString, int>> hashToFile;
+    QSet<QString> metaFileRequests;
+    QMap<QByteArray, QPair<QString, QByteArray>> blockRequests;
     bool forward;
+    static const int BLOCKSIZE = 8000;
+    int file_id = 0;
 
 public:
     Node();
@@ -58,6 +67,12 @@ public:
     QString& getUserName();
     void sendMsg(const QHostAddress& receiverIP , quint16 receiverPort, const QVariantMap& msg);
     void sendMsgToAllPeers(const QVariantMap& msg);
-
+    void shareFile(const QString& filename);
+    void sendBlockRequest(const QString& nodeId, const QString& hash);
+    void processBlockRequest(QVariantMap request);
+    QByteArray readBlockData(QString& filename, int id);
+    void write(const QString& filename, const QByteArray& data);
+    void receiveBlockReply(QVariantMap reply);
+    void download(const QString& nodeId, const QString& hash);
 };
 #endif // NODE_H

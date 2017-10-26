@@ -13,9 +13,11 @@ HEADERS += main.hh \
     netsocket.h \
     peer.h \
     node.h \
-    p2pchatdialog.h
+    p2pchatdialog.h \
+    file.h
 SOURCES += main.cc \
     netsocket.cpp \
     peer.cpp \
     node.cpp \
-    p2pchatdialog.cpp
+    p2pchatdialog.cpp \
+    file.cpp

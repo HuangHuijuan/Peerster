@@ -1,9 +1,12 @@
 #include <QDateTime>
 #include <QApplication>
 #include <QListWidget>
+#include <QFile>
+#include <QCryptographicHash>
 #include "netsocket.h"
 #include "peer.h"
 #include "node.h"
+#include "file.h"
 
 Node::Node()
 {
@@ -379,6 +382,136 @@ void Node::processStatusMsg(QVariantMap senderStatusMsg, const QHostAddress& sen
         }
     }
 
+}
+
+void Node::processBlockRequest(QVariantMap request)
+{
+    qDebug() << "BLOCK REQ: receive block request";
+
+    if (request["Dest"] != userName && request["HopLimit"].toInt() > 0 && forward) {
+        QPair<QHostAddress, quint16> pair = routingTable[request["Dest"].toString()];
+        request["HopLimit"] = request["HopLimit"].toInt() - 1;
+        sendMsg(pair.first, pair.second, request);
+    } else if (request["Dest"] == userName) {
+        QByteArray hash = request["BlockRequest"].toByteArray();
+        QString filename = hashToFile[hash].first;
+        int blockid = hashToFile[hash].second;
+        QByteArray data = readBlockData(filename, blockid);
+
+        QVariantMap reply;
+        reply.insert("Dest", request["Origin"].toString());
+        reply.insert("Origin", userName);
+        reply.insert("HopLimit", 10);
+        reply.insert("BlockReply", hash);
+        reply.insert("Data", data);
+
+        QPair<QHostAddress, quint16> pair = routingTable[request["Origin"].toString()];
+        sendMsg(pair.first, pair.second, reply);
+    }
+}
+
+void Node::receiveBlockReply(QVariantMap reply)
+{
+    qDebug() << "BLOCK REPlY: receive block reply";
+    QByteArray hash = reply["BlockReply"].toByteArray();
+    QByteArray data = reply["Data"].toByteArray();
+    QString origin = reply["Origin"].toString();
+    if (metaFileRequests.contains(hash)) {
+        //receive a metadata
+        int size = data.size();
+        QByteArray ba1 = data.mid(0, 20);
+        QByteArray ba2;
+        if (size > 20) {
+            ba2 += data.mid(20);
+        }
+        sendBlockRequest(origin, ba1);
+        QString fileName = "file_" + QString(file_id);
+        file_id++;
+        blockRequests[ba1] = QPair<QString, QByteArray>(fileName, ba2);
+        metaFileRequests.remove(hash);
+    } else if (blockRequests.contains(hash)){
+        //receive a data block
+        QString filename = blockRequests[hash].first;
+        write(filename, data);
+        QByteArray ba = blockRequests[hash].second;
+        if (ba.size() != 0) {
+            QByteArray ba1 = ba.mid(0, 20);
+            QByteArray ba2;
+            if (ba.size() > 20) {
+                ba2 += data.mid(20);
+            }
+            blockRequests[ba1] = QPair<QString, QByteArray>(filename, ba2);
+            sendBlockRequest(origin, ba1);
+        }
+        blockRequests.remove(hash);
+    }
+}
+
+QByteArray Node::readBlockData(QString& filename, int id)
+{
+    QFile file(filename);
+    QByteArray data;
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+        return data;
+    QTextStream in(&file);
+    in.seek(id * BLOCKSIZE);
+    data += in.read(8000);
+    return data;
+}
+
+void Node::shareFile(const QString& filename)
+{
+   QFile file(filename);
+   if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+       return;
+   qDebug() << "file size: " << file.size();
+   QByteArray bhash;
+   int i = 0;
+   while (!file.atEnd()) {
+       QByteArray data = file.read(BLOCKSIZE);
+       QByteArray h = QCryptographicHash::hash(data, QCryptographicHash::Sha1);
+       qDebug() << "hash size: " << h.size();
+       hashToFile.insert(h, QPair<QString, int>(filename, i));
+       bhash += h;
+   }
+
+ //  qDebug() << hash;
+   QString mfpath = filename.split(".")[0] + ".mf";
+   qDebug() << "metafile: " << mfpath;
+   write(mfpath, bhash);
+   QByteArray fid = QCryptographicHash::hash(bhash, QCryptographicHash::Sha1);
+   File *mf = new File(filename, file.size(), mfpath, fid);
+   metafiles[fid] = mf;
+   hashToFile.insert(fid, QPair<QString, int>(mfpath, 0));
+}
+void Node::download(const QString& nodeId, const QString& hash)
+{
+    sendBlockRequest(nodeId, hash);
+    metaFileRequests.insert(hash);
+}
+
+void Node::sendBlockRequest(const QString& nodeId, const QString& hash)
+{
+    QVariantMap msg;
+    msg.insert("Dest", nodeId);
+    msg.insert("Origin", userName);
+    msg.insert("HopLimit", 10);
+    msg.insert("BlockRequest", hash);
+
+    QPair<QHostAddress, quint16> pair = routingTable[nodeId];
+    sendMsg(pair.first, pair.second, msg);
+
+    qDebug() << "send block request to " << pair.first;
+}
+
+void Node::write(const QString& filename, const QByteArray& data)
+{
+    QFile f(filename);
+    if (!f.open(QIODevice::WriteOnly | QIODevice::Append)) {
+        return;
+    }
+    QTextStream out(&f);
+    out << data;
 }
 
 

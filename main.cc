@@ -4,6 +4,7 @@
 #include <QKeyEvent>
 #include <QVector>
 #include <QFormLayout>
+#include <QFileDialog>
 #include "p2pchatdialog.h"
 #include "main.hh"
 
@@ -14,14 +15,24 @@ ChatDialog::ChatDialog()
     label = new QLabel("hostname:port/ipaddr:port :", this);
     peerInfo = new QLineEdit(this);
     addButton = new QPushButton("Add Peer",this);
-
 //    peerListLabel = new QLabel("Peer List:");
 //    peerList = new QTextEdit(this);
 //    peerList->setReadOnly(true);
-
     peerLabel = new QLabel("Online Peers:");
     onlinePeers = new QListWidget(this);
 
+    flable = new QLabel("Selected Files:", this);
+    selectedFiles = new QListWidget(this);
+    addFileBtn = new QPushButton("Add Files", this);
+    shareFileBtn = new QPushButton("Share Files", this);
+    nodeIdLabel = new QLabel("Node Id:");
+    nodeIdLabel->setFixedWidth(55);
+    nodeId = new QLineEdit(this);
+    QLabel* l = new QLabel("Type the node id or select from the left by single click.");
+    fileIdLabel = new QLabel("File Id:");
+    fileIdLabel->setFixedWidth(55);
+    fileId = new QLineEdit(this);
+    downloadBtn = new QPushButton("Download File", this);
 
 	// Read-only text box where we display messages from everyone.
 	// This widget expands both horizontally and vertically.
@@ -54,9 +65,28 @@ ChatDialog::ChatDialog()
     layout2->addWidget(peerLabel);
     layout2->addWidget(onlinePeers);
 
+    QVBoxLayout *layout3 = new QVBoxLayout();
+    layout3->addWidget(flable);
+    layout3->addWidget(selectedFiles);
+    layout3->addWidget(addFileBtn);
+    layout3->addWidget(shareFileBtn);
+
+    QHBoxLayout *layout3_1 = new QHBoxLayout();
+    layout3_1->addWidget(nodeIdLabel);
+    layout3_1->addWidget(nodeId);
+    QHBoxLayout *layout3_2 = new QHBoxLayout();
+    layout3_2->addWidget(fileIdLabel);
+    layout3_2->addWidget(fileId);
+
+    layout3->addWidget(l);
+    layout3->addLayout(layout3_1);
+    layout3->addLayout(layout3_2);
+    layout3->addWidget(downloadBtn);
+
     QHBoxLayout *globalLayout = new QHBoxLayout();
     globalLayout->addLayout(layout1);
     globalLayout->addLayout(layout2);
+    globalLayout->addLayout(layout3);
     setLayout(globalLayout);
 
     mapper = new QSignalMapper();
@@ -64,8 +94,11 @@ ChatDialog::ChatDialog()
     node = new Node();
 
     connect(addButton, SIGNAL(clicked()), this, SLOT(addPeerButtonClicked()));
+    connect(addFileBtn, SIGNAL(clicked()), this, SLOT(addFileButtonClicked()));
+    connect(shareFileBtn, SIGNAL(clicked()), this, SLOT(shareFileButtonClicked()));
     connect(node, SIGNAL(newLog(QString)), this, SLOT(appendLog(QString)));
     connect(node, SIGNAL(newPeer(QString)), this, SLOT(addPeer(QString)));
+    connect(onlinePeers, SIGNAL(itemClicked(QListWidgetItem*)), this, SLOT(selectNode(QListWidgetItem*)));
     connect(onlinePeers, SIGNAL(itemDoubleClicked(QListWidgetItem*)), this, SLOT(newDialog(QListWidgetItem*)));
     connect(node, SIGNAL(newPrivateLog(QString,QString)), this, SLOT(receiveNewPrivLog(QString, QString)));
 }
@@ -115,6 +148,27 @@ void ChatDialog::addPeerButtonClicked()
 
 }
 
+void ChatDialog::addFileButtonClicked()
+{
+    QStringList filenames = QFileDialog::getOpenFileNames(this, tr("Select Files"), QDir::currentPath(), tr("txt files (*.txt);;all files (*)"));
+    if (!filenames.isEmpty())
+    {
+        for (int i = 0; i < filenames.count(); i++) {
+            selectedFiles->addItem(filenames.at(i));
+        }
+    }
+}
+
+void ChatDialog::shareFileButtonClicked()
+{
+
+    for (int i = 0; i < selectedFiles->count(); i++) {
+        QString filename = selectedFiles->item(i)->text();
+        node->shareFile(filename);
+    }
+    selectedFiles->clear();
+}
+
 void ChatDialog::gotReturnPressed()
 {
 	// Initially, just echo the string locally.
@@ -153,12 +207,16 @@ void ChatDialog::addPeer(const QString& s)
     onlinePeers->addItem(s);
 }
 
-void ChatDialog::closeEvent ( QCloseEvent * event )
+void ChatDialog::closeEvent (QCloseEvent * event)
 {
     event->accept();
     exit(0);
 }
 
+void ChatDialog::selectNode(QListWidgetItem *item)
+{
+    nodeId->insert(item->text());
+}
 int main(int argc, char **argv)
 {
 	// Initialize Qt toolkit
