@@ -13,7 +13,7 @@ public:
     QString name;
     quint32 size;
     QString metafile;
-    QString hash;
+    QByteArray hash;
 };
 
 #endif // FILE_H

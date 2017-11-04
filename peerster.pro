@@ -7,6 +7,7 @@ TARGET = peerster
 DEPENDPATH += .
 INCLUDEPATH += .
 QT += widgets network
+CONFIG += crypto
 
 # Input
 HEADERS += main.hh \

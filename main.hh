@@ -21,7 +21,6 @@ public:
 public slots:
 	void gotReturnPressed();
     void addPeerButtonClicked();
-    void addFileButtonClicked();
     void shareFileButtonClicked();
     void appendLog(const QString& text);
     void addPeer(const QString& s);
@@ -30,33 +29,33 @@ public slots:
     void receiveNewPrivLog(const QString& origin, const QString& text);
     void p2pdialogClosed(const QString& item);
     void selectNode(QListWidgetItem*);
+    void downloadFile();
+    void search();
+    void addSearchRes(const QString& res);
+    void downloadSearchedFile(QListWidgetItem *item);
 
 protected:
 	bool eventFilter(QObject *obj, QEvent *e);
     void closeEvent ( QCloseEvent * event);
 	
 private:
-    QLabel *label;
-    QLabel *peerLabel;
-    QLabel *peerListLabel;
     QLineEdit *peerInfo;
     QPushButton *addButton;
 	QTextEdit *textview;
 	QTextEdit *textline;
     QTextEdit *peerList;
     QListWidget *onlinePeers;
-    QLabel *flable;
-    QListWidget *selectedFiles;
-    QPushButton *addFileBtn;
+    QListWidget *sharedFiles;
     QPushButton *shareFileBtn;
-    QLabel *nodeIdLabel;
     QLineEdit *nodeId;
-    QLabel *fileIdLabel;
     QLineEdit *fileId;
     QPushButton *downloadBtn;
     Node *node;
     QSignalMapper *mapper;
     QMap<QString, P2PChatDialog*> peerDialogMap;
+    QListWidget *fileLists;
+    QLineEdit *keywords;
+    QPushButton *searchBtn;
 };
 
 

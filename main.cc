@@ -12,24 +12,23 @@ ChatDialog::ChatDialog()
 {
 	setWindowTitle("Peerster");
 
-    label = new QLabel("hostname:port/ipaddr:port :", this);
+    QLabel* label = new QLabel("hostname:port/ipaddr:port :", this);
     peerInfo = new QLineEdit(this);
     addButton = new QPushButton("Add Peer",this);
 //    peerListLabel = new QLabel("Peer List:");
 //    peerList = new QTextEdit(this);
 //    peerList->setReadOnly(true);
-    peerLabel = new QLabel("Online Peers:");
+    QLabel* peerLabel = new QLabel("Online Peers:");
     onlinePeers = new QListWidget(this);
 
-    flable = new QLabel("Selected Files:", this);
-    selectedFiles = new QListWidget(this);
-    addFileBtn = new QPushButton("Add Files", this);
+    QLabel* flable = new QLabel("Shared Files:", this);
+    sharedFiles = new QListWidget(this);
     shareFileBtn = new QPushButton("Share Files", this);
-    nodeIdLabel = new QLabel("Node Id:");
+    QLabel* nodeIdLabel = new QLabel("Node Id:");
     nodeIdLabel->setFixedWidth(55);
     nodeId = new QLineEdit(this);
     QLabel* l = new QLabel("Type the node id or select from the left by single click.");
-    fileIdLabel = new QLabel("File Id:");
+    QLabel* fileIdLabel = new QLabel("File Id:");
     fileIdLabel->setFixedWidth(55);
     fileId = new QLineEdit(this);
     downloadBtn = new QPushButton("Download File", this);
@@ -48,6 +47,13 @@ ChatDialog::ChatDialog()
 	textline = new QTextEdit(this);
 	textline->setFocus();
 	textline->installEventFilter(this);
+
+
+    QLabel* searchResultLabel = new QLabel("Search Results:", this);
+    fileLists = new QListWidget(this);
+    QLabel* keywordLabel = new QLabel("Keywords:", this);
+    keywords = new QLineEdit(this);
+    searchBtn = new QPushButton("Search", this);
 	// Lay out the widgets to appear in the main window.
 	// For Qt widget and layout concepts see:
 	// http://doc.qt.nokia.com/4.7-snapshot/widgets-and-layouts.html
@@ -67,8 +73,7 @@ ChatDialog::ChatDialog()
 
     QVBoxLayout *layout3 = new QVBoxLayout();
     layout3->addWidget(flable);
-    layout3->addWidget(selectedFiles);
-    layout3->addWidget(addFileBtn);
+    layout3->addWidget(sharedFiles);
     layout3->addWidget(shareFileBtn);
 
     QHBoxLayout *layout3_1 = new QHBoxLayout();
@@ -83,10 +88,19 @@ ChatDialog::ChatDialog()
     layout3->addLayout(layout3_2);
     layout3->addWidget(downloadBtn);
 
+    QVBoxLayout *layout4 = new QVBoxLayout();
+    layout4->addWidget(searchResultLabel);
+    layout4->addWidget(fileLists);
+    layout4->addWidget(keywordLabel);
+    layout4->addWidget(keywords);
+    layout4->addWidget(searchBtn);
+
+
     QHBoxLayout *globalLayout = new QHBoxLayout();
     globalLayout->addLayout(layout1);
     globalLayout->addLayout(layout2);
     globalLayout->addLayout(layout3);
+    globalLayout->addLayout(layout4);
     setLayout(globalLayout);
 
     mapper = new QSignalMapper();
@@ -94,13 +108,16 @@ ChatDialog::ChatDialog()
     node = new Node();
 
     connect(addButton, SIGNAL(clicked()), this, SLOT(addPeerButtonClicked()));
-    connect(addFileBtn, SIGNAL(clicked()), this, SLOT(addFileButtonClicked()));
     connect(shareFileBtn, SIGNAL(clicked()), this, SLOT(shareFileButtonClicked()));
+    connect(downloadBtn, SIGNAL(clicked(bool)), this, SLOT(downloadFile()));
     connect(node, SIGNAL(newLog(QString)), this, SLOT(appendLog(QString)));
     connect(node, SIGNAL(newPeer(QString)), this, SLOT(addPeer(QString)));
     connect(onlinePeers, SIGNAL(itemClicked(QListWidgetItem*)), this, SLOT(selectNode(QListWidgetItem*)));
     connect(onlinePeers, SIGNAL(itemDoubleClicked(QListWidgetItem*)), this, SLOT(newDialog(QListWidgetItem*)));
     connect(node, SIGNAL(newPrivateLog(QString,QString)), this, SLOT(receiveNewPrivLog(QString, QString)));
+    connect(searchBtn, SIGNAL(clicked(bool)), this, SLOT(search()));
+    connect(node, SIGNAL(newSearchRes(QString)), this, SLOT(addSearchRes(QString)));
+    connect(fileLists, SIGNAL(itemDoubleClicked(QListWidgetItem*)), this, SLOT(downloadSearchedFile(QListWidgetItem*)));
 }
 
 
@@ -148,25 +165,18 @@ void ChatDialog::addPeerButtonClicked()
 
 }
 
-void ChatDialog::addFileButtonClicked()
-{
-    QStringList filenames = QFileDialog::getOpenFileNames(this, tr("Select Files"), QDir::currentPath(), tr("txt files (*.txt);;all files (*)"));
-    if (!filenames.isEmpty())
-    {
-        for (int i = 0; i < filenames.count(); i++) {
-            selectedFiles->addItem(filenames.at(i));
-        }
-    }
-}
+
 
 void ChatDialog::shareFileButtonClicked()
 {
-
-    for (int i = 0; i < selectedFiles->count(); i++) {
-        QString filename = selectedFiles->item(i)->text();
-        node->shareFile(filename);
+    QStringList filenames = QFileDialog::getOpenFileNames(this, tr("Select Files"), QDir::currentPath(), tr("all files (*)"));
+    if (!filenames.isEmpty())
+    {
+        for (int i = 0; i < filenames.count(); i++) {
+            sharedFiles->addItem(filenames.at(i));
+            node->shareFile(filenames.at(i));
+        }
     }
-    selectedFiles->clear();
 }
 
 void ChatDialog::gotReturnPressed()
@@ -217,8 +227,33 @@ void ChatDialog::selectNode(QListWidgetItem *item)
 {
     nodeId->insert(item->text());
 }
+
+void ChatDialog::downloadFile()
+{
+    node->download(nodeId->text(), fileId->text());
+    nodeId->clear();
+    fileId->clear();
+}
+
+void ChatDialog::search()
+{
+    node->initSearch(keywords->text());
+    keywords->clear();
+}
+
+void ChatDialog::addSearchRes(const QString &res)
+{
+    fileLists->addItem(res);
+}
+
+void ChatDialog::downloadSearchedFile(QListWidgetItem *item)
+{
+    node->downloadSearchedFile(item->text());
+}
+
 int main(int argc, char **argv)
 {
+    QCA::Initializer qcainit;
 	// Initialize Qt toolkit
 	QApplication app(argc,argv);
 
