@@ -57,7 +57,7 @@ private:
     bool forward;
     static const int BLOCKSIZE = 8000;
    // QString META_FILES_DIR = "metafiles/";
-    QString DOWNLOAD_FILES_DIR = "downloads/";
+    QString DOWNLOAD_FILES_DIR = "downloads";
     int file_id;
 
 public:

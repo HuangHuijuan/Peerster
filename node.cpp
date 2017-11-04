@@ -3,6 +3,7 @@
 #include <QListWidget>
 #include <QFile>
 #include <QFileInfo>
+#include <QDir>
 #include "netsocket.h"
 #include "peer.h"
 #include "node.h"
@@ -469,8 +470,12 @@ void Node::receiveBlockReply(const QVariantMap& reply)
         }
         sendBlockRequest(origin, ba1);
         QString fileName = metaFileRequests[hashHex];
+        QDir dir(DOWNLOAD_FILES_DIR);
+        if (!dir.exists()) {
+            QDir().mkdir(DOWNLOAD_FILES_DIR);
+        }
         if (fileName == "") {
-             fileName = DOWNLOAD_FILES_DIR + "file_" + QString::number(file_id) + ".dn";
+             fileName = DOWNLOAD_FILES_DIR + "/file_" + QString::number(file_id) + ".dn";
              file_id++;
         }
         QFile* f = new QFile(fileName);
@@ -755,7 +760,7 @@ void Node::downloadSearchedFile(const QString& fileId)
     QPair<QString, QByteArray> p = searchReplies[fileId];
     qDebug() << "selected File: " << fileId;
     sendBlockRequest(p.first, p.second);
-    metaFileRequests[QCA::arrayToHex(p.second)] = DOWNLOAD_FILES_DIR + fileId.split(":")[1];
+    metaFileRequests[QCA::arrayToHex(p.second)] = DOWNLOAD_FILES_DIR + "/" + fileId.split(":")[1];
 }
 
 
