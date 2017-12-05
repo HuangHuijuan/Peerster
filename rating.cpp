@@ -67,7 +67,7 @@ bool Rating::addUserRating(const QString &fileID, const QString &userName, doubl
         }
         else
         {
-          fileReputaion.value(fileID).insert(userName, score);
+          fileReputation[fileID].insert(userName, score);
         }
      }
      else
