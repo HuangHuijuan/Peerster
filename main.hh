@@ -22,17 +22,17 @@ public slots:
 	void gotReturnPressed();
     void addPeerButtonClicked();
     void shareFileButtonClicked();
+    void addFriendBtnClicked();
     void appendLog(const QString& text);
     void addPeer(const QString& s);
     void newDialog(QListWidgetItem*);
     void sendPrivMsg(const QString& des, const QString& content);
     void receiveNewPrivLog(const QString& origin, const QString& text);
     void p2pdialogClosed(const QString& item);
-    void selectNode(QListWidgetItem*);
-    void downloadFile();
     void search();
-    void addSearchRes(const QString& res);
+    void addSearchRes(int row, const QString& fileId, double score);
     void downloadSearchedFile(QListWidgetItem *item);
+    void askRate(const QString& fileId, const QString& filename, const QString& publisher);
 
 protected:
 	bool eventFilter(QObject *obj, QEvent *e);
@@ -47,15 +47,15 @@ private:
     QListWidget *onlinePeers;
     QListWidget *sharedFiles;
     QPushButton *shareFileBtn;
-    QLineEdit *nodeId;
-    QLineEdit *fileId;
-    QPushButton *downloadBtn;
     Node *node;
     QSignalMapper *mapper;
     QMap<QString, P2PChatDialog*> peerDialogMap;
     QListWidget *fileLists;
     QLineEdit *keywords;
     QPushButton *searchBtn;
+    QLineEdit *friendID;
+    QPushButton *addFriendBtn;
+    QMap<QString, QString> fileInfo;
 };
 
 

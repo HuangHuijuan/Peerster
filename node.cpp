@@ -19,8 +19,12 @@ Node::Node()
     seqNo = 1;
 
     qsrand(QDateTime::currentMSecsSinceEpoch() / 1000);
-    userName = QHostInfo::localHostName() + "-" + QString::number(sock.getPort()) + "-" + QString::number(qrand() % 1000);
 
+    arguments = QCoreApplication::arguments();
+    parseIndex = 1;
+    setServerAddress();
+    setUserName();
+    msgSender = new MsgSender(serverIP, serverPort, userName, &sock);
     aETimer.setInterval(10000);
     rrTimer.setInterval(60000);
 
@@ -38,15 +42,58 @@ Node::Node()
     forward = true;
     file_id = 0;
 
+    setNoForward();
     initializeNeighbors();
+
+    rating = new Rating();
+    calculator = new ScoreCalculator();
+
+    qDebug() << "Username: " << userName;
 }
 
+Node::~Node()
+{
+    delete rating;
+    delete msgSender;
+    delete calculator;
+}
+
+void Node::setServerAddress()
+{
+    if (arguments.size() > 3 && arguments[1] == "-s") {
+        QStringList parts = arguments[2].split(":");
+        QHostInfo serverInfo = QHostInfo::fromName(parts[0]);
+        serverIP = serverInfo.addresses().first();
+        serverPort = parts[1].toInt();
+        parseIndex = 3;
+    } else {
+        throw "Usage: -s severIP:severPort -u username [-noforward] [neighborIP:neighborPort]*";
+    }
+}
+
+void Node::setUserName()
+{
+    if (arguments.size() > parseIndex + 1 && arguments[parseIndex] == "-u") {
+        userName = arguments[++parseIndex];
+        parseIndex++;
+    } else {
+        userName = QHostInfo::localHostName() + "-" + QString::number(sock.getPort()) + "-" + QString::number(qrand() % 1000);
+    }
+}
+
+void Node::setNoForward()
+{
+    if (arguments.size() > parseIndex && arguments[parseIndex] == "-noforward") {
+        forward = false;
+        parseIndex++;
+    }
+}
 void Node::initializeNeighbors()
 {
     QHostInfo info = QHostInfo::fromName(QHostInfo::localHostName());
     myAddress = info.addresses().first();
 
-    qDebug() << myAddress.toIPv4Address() << myAddress.toString() << info.hostName();
+    qDebug() << myAddress.toString() << info.hostName();
 
     for (int p = sock.getMyPortMin(); p <= sock.getMyPortMax(); p++) {
         if (p == sock.getPort()) {
@@ -56,17 +103,10 @@ void Node::initializeNeighbors()
         peers.insert(peer->toString(), peer);
         //peersList->addItem(peer->toString());
     }
-
-    //add host from command line to peer
-    QStringList arguments = QCoreApplication::arguments();
-
-    if (arguments.size() > 1) {
-        int start = 1;
-        if (arguments[1] == "-noforward") {
-            forward = false;
-            start = 2;
-        }
-        for (int i = start; i < arguments.size(); i++) {
+    if (arguments.size() > parseIndex && arguments[parseIndex] == "-n") {
+        parseIndex++;
+        for (int i = parseIndex; i < arguments.size(); i++) {
+            qDebug() << arguments[i];
             QStringList list = arguments[i].split(":");
             QHostInfo peerinfo = QHostInfo::fromName(list[0]);
             QHostAddress address = peerinfo.addresses().first();
@@ -77,7 +117,6 @@ void Node::initializeNeighbors()
 //            lookUp.insert(QString::number(id), list[1].toInt());
         }
     }
-
     //start up
     sendRouteRumor();
 }
@@ -225,14 +264,20 @@ void Node::readPendingDatagrams()
         QHostAddress sender;
         quint16 senderPort;
         sock.readDatagram(datagram.data(), datagram.size(), &sender, &senderPort);
-        if (!peers.contains(sender.toString() + ":" + senderPort)) {
-            int id = QHostInfo::lookupHost(sender.toString(), this, SLOT(lookedUp(QHostInfo)));
-            lookUp.insert(QString::number(id), senderPort);
-        }
         QDataStream in(&datagram, QIODevice::ReadOnly);
         QVariantMap msg;
         in >> msg;
-     //   qDebug() << msg;
+        // receive msg from server
+        if (msg.contains("IntimacyList")) { //TBD, receive msg from server
+            processIntimacyMsg(msg);
+            return;
+        }
+
+        //receive msg from peer
+        if (!peers.contains(sender.toString() + ":" + senderPort) && (sender != myAddress || senderPort != sock.getPort())) {
+            int id = QHostInfo::lookupHost(sender.toString(), this, SLOT(lookedUp(QHostInfo)));
+            lookUp.insert(QString::number(id), senderPort);
+        }
         if (msg.contains("Search")) {
             processSearchRequest(msg);
         } else if (msg.contains("Dest")) {
@@ -273,6 +318,7 @@ void Node::processRumorMsg(QVariantMap rumorMsg, const QHostAddress& sender, qui
     QString msgId = origin + "_" + QString::number(n);
     QVariantMap map = statusMsg["Want"].toMap();
 
+
     if (rumorMsg.contains("LastIP")) { 
         quint32 lastIP = rumorMsg["LastIP"].toInt();
         QString address= QHostAddress(lastIP).toString();
@@ -302,6 +348,11 @@ void Node::processRumorMsg(QVariantMap rumorMsg, const QHostAddress& sender, qui
                 //send the new rumor to its neighbour
             continueRumormongering(msgId, sender, senderPort);
 
+        } else if (rumorMsg.contains("Score")) { // receive voting from other peers
+            QString fileId = rumorMsg["FileID"].toString();
+            double score = rumorMsg["Score"].toDouble();
+            rating->addUserRating(fileId, origin, score);
+
         } else { //route rumor message
             qDebug() << "ROUTE RUMOR: receive route rumor from " << sender.toString() << ": " << msgId;
             sendMsgToAllPeers(rumorMsg);
@@ -311,13 +362,14 @@ void Node::processRumorMsg(QVariantMap rumorMsg, const QHostAddress& sender, qui
 
         addStatus(origin, n);
 
-        if (!routingTable.contains(origin)) {
-            emit newPeer(origin);
-            qDebug() << "Add peer to routing table:" << origin;
-            sendRouteRumor();
+        if (origin != userName) {
+            if (!routingTable.contains(origin)) {
+                emit newPeer(origin);
+                qDebug() << "Add peer to routing table:" << origin;
+                sendRouteRumor();
+            }
+            routingTable.insert (origin, QPair<QHostAddress, quint16>(sourceIP, sourcePort));
         }
-        routingTable.insert (origin, QPair<QHostAddress, quint16>(sourceIP, sourcePort));
-    //    qDebug() << "routingTable insert" << origin << " " << sender;
     } else if (map.contains(origin) && map[origin].toInt() - 1 == n) {
          if(!rumorMsg.contains("LastIP")) {
          //    qDebug() << "receive direct msg from" << sender.toString() << ": " << msgId;;
@@ -481,25 +533,29 @@ void Node::receiveBlockReply(const QVariantMap& reply)
         QFile* f = new QFile(fileName);
         f->open(QFile::WriteOnly|QFile::Truncate);
         f->close();
-        blockRequests[ba1] = QPair<QFile*, QByteArray>(f, ba2);
+        blockRequests[ba1] = new Block(hashHex, fileName, origin, f, ba1, ba2);
         metaFileRequests.remove(hashHex);
     } else if (blockRequests.contains(hash)){
         //receive a data block
         qDebug() << "receive Data Block";
-        QFile* file = blockRequests[hash].first;
+        Block *b = blockRequests[hash];
+        QFile* file = b->file;
         write(file, data);
-        QByteArray ba = blockRequests[hash].second;
+        QByteArray ba = b->remain_hash;
         if (ba.size() != 0) {
             QByteArray ba1 = ba.mid(0, 20);
             QByteArray ba2;
             if (ba.size() > 20) {
                 ba2 += ba.mid(20);
             }
-            blockRequests[ba1] = QPair<QFile*, QByteArray>(file, ba2);
+            blockRequests[ba1] = new Block(b->metadataStr, b->filename, b->publisher, file, ba1, ba2);
             sendBlockRequest(origin, ba1);
         } else {
+            //finished download;
+            emit downloadFinished(b->metadataStr, b->filename.split("/")[1], b->publisher);
             delete file;
         }
+        delete b;
         blockRequests.remove(hash);
     }
 }
@@ -537,21 +593,14 @@ void Node::shareFile(const QString& filepath)
        i++;
    }
 
- //  qDebug() << hash;
- //  QString mfpath = META_FILES_DIR + filename.split(".")[0] + QString::number(qrand() % 1000) + ".mt";
- //  qDebug() << "metafile: " << mfpath;
- //  qDebug() << i;
    qDebug() << "hash size:" << bhash.size();
- //  writeMeta(mfpath, bhash);
    QCA::Hash shaHash("sha1");
    shaHash.update(bhash);
    QByteArray hashResult = shaHash.final().toByteArray();
    QString fid = QCA::arrayToHex(hashResult);
    qDebug() << "Hash result:" << fid;
-   File *mf = new File(filename, file.size(), bhash, hashResult);
-   metafiles[filename] = mf;
+   metafiles.insertMulti(filename, hashResult);
    metadatas.insert(fid, bhash);
- //  hashToFile.insert(fid, QPair<QString, int>(mfpath, 0));
 }
 void Node::download(const QString& nodeId, const QString& hash)
 {
@@ -596,6 +645,17 @@ void Node::writeMeta(const QString& filename, const QByteArray& data)
 
 void Node::initSearch(const QString keywords)
 {
+    searchReplies.clear();
+    scores.clear();
+    searchMatches.clear();
+    for (auto i = searchTimers.begin(); i != searchTimers.end(); i++) {
+        QTimer* timer = i.value();
+        timer->stop();
+        signalMapper->removeMappings(timer);
+        delete timer;
+    }
+    searchTimers.clear();
+
     qDebug() << "Search keywords: " << keywords;
     Peer *neighbor = getNeighbor();
     sendSearchReq(userName, keywords, 2, neighbor->getAddress(), neighbor->getPort());
@@ -665,12 +725,16 @@ void Node::processSearchRequest(const QVariantMap& req) {
     for (int i = 0; i < keywordList.size(); i++) {
         QVariantList matchNames;
         QVariantList matchIds;
-        for (auto itr = metafiles.begin(); itr != metafiles.end(); itr++) {
+        QMapIterator<QString, QByteArray> itr(metafiles);
+        while (itr.hasNext()) {
+            itr.next();
             QString filename = itr.key();
             if (filename.contains(keywordList[i], Qt::CaseInsensitive)) {
-                matchNames.append(filename);
-                File *mf = itr.value();
-                matchIds.append(mf->hash);
+                QList<QByteArray> ids = metafiles.values(filename);
+                for (int i = 0; i < ids.size(); i++) {
+                    matchNames.append(filename);
+                    matchIds.append(ids[i]);
+                }
             }
         }
 
@@ -739,28 +803,93 @@ void Node::processSearchReply(const QVariantMap& reply)
         qDebug() << reply;
         return;
     }
+    qDebug() << reply;
     QString origin = reply["Origin"].toString();
     QVariantList matchNames = reply["MatchNames"].toList();
     QVariantList matchIds = reply["MatchIDs"].toList();
     for (int i = 0; i < matchNames.size(); i++) {
+        QByteArray hash = matchIds[i].toByteArray();
+        QString metadataStr = QCA::arrayToHex(hash);
         QString filename = matchNames[i].toString();
         qDebug() << filename;
-        QString source = origin + ":"+ filename;
-        if (searchReplies.contains(source)) {
+        QString fileId = metadataStr + ";" + filename + ";" + origin;
+        if (searchReplies.contains(fileId)) {
             continue;
         }
-        QByteArray hash = matchIds[i].toByteArray();
-        searchReplies.insert(source, QPair<QString, QByteArray>(origin, hash));
-        emit newSearchRes(source);
+        searchReplies.insert(fileId);
+      //  emit newSearchRes(source);
+        sendIntimacyReq(fileId, origin);
     }
 }
 
 void Node::downloadSearchedFile(const QString& fileId)
 {
-    QPair<QString, QByteArray> p = searchReplies[fileId];
-    qDebug() << "selected File: " << fileId;
-    sendBlockRequest(p.first, p.second);
-    metaFileRequests[QCA::arrayToHex(p.second)] = DOWNLOAD_FILES_DIR + "/" + fileId.split(":")[1];
+    qDebug() << fileId;
+    QStringList info = fileId.split(";");
+    QString metadataStr = info[0];
+    QString filename = info[1];
+    QString origin = info[2];
+    qDebug() << "selected File: " << filename << " from " << origin;
+    sendBlockRequest(origin, QCA::hexToArray(metadataStr));
+    metaFileRequests[metadataStr] = DOWNLOAD_FILES_DIR + "/" + filename;
 }
 
+void Node::sendRating(const QString& fileId, const QString& publisher, double score)
+{
+    qDebug() << "send rating scores: " << score;
+    //send rating result to server
+//    msgSender->sendFileRating(fileId, publisher, score);
+    QVariantMap msg;
+    msg.insert("FileID", fileId);
+    msg.insert("Publisher", publisher);
+    msg.insert("Origin", userName);
+    msg.insert("Score", score);
+    msg.insert("SeqNo", seqNo);
+    QString msgId = userName + "_" + QString::number(seqNo);
+    msgRepo.insert(msgId, msg);
+    Peer *neighbor = getNeighbor();
+    sendRumorMsg(neighbor->getAddress(), neighbor->getPort(), msgId);
+    addStatus(userName, seqNo);
+    seqNo++;
+    rating->addUserRating(fileId, userName, score);
+}
 
+void Node::sendAddFriendReq(const QString& friendId)
+{
+    //send add friend request to server
+    msgSender->sendAddFriendMsg(friendId);
+}
+
+void Node::sendIntimacyReq(const QString &fileId, const QString& publisher)
+{
+    //send score request to server
+    QMap<QString, double> votersAndScores = rating->getFileRating(fileId);
+    QStringList peersList(votersAndScores.keys());
+    peersList.append(publisher);
+    msgSender->sendIntimacyReq(fileId, peersList);
+}
+
+void Node::processIntimacyMsg(const QVariantMap& msg)
+{
+    qDebug() << "receive intimacy list:";
+    qDebug() << msg;
+    QString fileId = msg["FileID"].toString();
+    QMap<QString, QVariant> intimacyList = msg["IntimacyList"].toMap();
+    QMap<QString, double> convert;
+    for (auto i = intimacyList.begin(); i != intimacyList.end(); i++) {
+        convert[i.key()] = i.value().toDouble();
+    }
+    double score = calculator->getScore(userName, fileId, convert, rating);
+    QMapIterator<double, QString> i(scores);
+    int row = 0;
+    while (i.hasNext()) {
+        i.next();
+        if (i.key() > score) {
+            break;
+        }
+        row += scores.values(i.key()).size();
+    }
+    row = scores.size() - row;
+    scores.insertMulti(score, fileId);
+    emit newSearchRes(row, fileId, score);
+}

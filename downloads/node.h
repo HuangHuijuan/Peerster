@@ -15,8 +15,6 @@
 #include "file.h"
 #include "msgsender.h"
 #include "block.h"
-#include "rating.h"
-#include "scorecalculator.h"
 
 class Node : public QObject {
 
@@ -29,7 +27,7 @@ public slots:
     void sendRouteRumor();
     void continueRumormongering(const QString& rumorId);
     void continueSearch(const QString& keywords);
-    void sendRating(const QString& fileId, const QString& publisher, double score);
+    void sendRating(const QString& fileId, const QString& publisher, int score);
 
 signals:
     void newLog(const QString& text);
@@ -47,8 +45,10 @@ private:
     QMap<QString, Peer*> peers;
     QMap<QString, int> lookUp;
     int seqNo;
+    QString userName;
     QHash<QString, QPair<QHostAddress, quint16>> routingTable;
     QMap<QString, QTimer*> rumorTimers;
+    QMap<QString, QString> keywordMap;
     QMap<QString, QTimer*> searchTimers;
     QMap<QString, QPair<quint32, quint32>> searchMatches;
     QHostAddress myAddress;
@@ -71,15 +71,11 @@ private:
 
     //interact with server
     MsgSender *msgSender;
-    Rating *rating;
-    ScoreCalculator *calculator;
 
 public:
     Node();
-    ~Node();
     void setUserName();
     void setServerAddress();
-    void setNoForward();
     void addStatus(const QString& origin, int seqNo);
     void sendStatusMsg(const QHostAddress& a, quint16 p);
     Peer* getNeighbor();
@@ -114,9 +110,7 @@ public:
     void processSearchReply(const QVariantMap& reply);
     void downloadSearchedFile(const QString& fileId);
     void sendAddFriendReq(const QString& friendId);
-    void sendIntimacyReq(const QString& fileId, const QString& publisher);
-    void processIntimacyMsg(const QVariantMap& msg);
-
-    QString userName;
+    void sendScoreReq(const QString& fileId, const QString& publisher);
+    void processScoreMsg(const QVariantMap& msg);
 };
 #endif // NODE_H
