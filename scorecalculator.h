@@ -9,13 +9,14 @@ public:
     ScoreCalculator();
     double getScore(const QString &userName, const QString &fileID, QMap<QString, double> intimacyList, Rating *rating);
     double getPredictedRating(const QString &userName, const QString &fileID, QMap<QString, double> intimacyList, Rating *rating);
-    double getCredenceValue(const QString &userName, const QString &fileID, Rating *rating,  QMap<QString, double> intimacyList);
+    double getCredenceValue(const QString &userName, const QString &fileID, Rating *rating);
     double getSimilarity(const QString &u1,const  QString &u2, Rating *rating);
     double getPlisherInfluence(const QString &fileID,  QMap<QString, double> intimacyList);
-
+    double getFriendInfluence(const QString &fileID,  QMap<QString, double> intimacyList, Rating *rating);
 private:
     double ALPHA;
     double BETA;
+    double GAMA;
     double FULL_SCORE;
 };
 

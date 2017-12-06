@@ -448,7 +448,7 @@ void Node::processStatusMsg(QVariantMap senderStatusMsg, const QHostAddress& sen
             return;
         } else if (rumorTimers.contains(msgId)) {
             if (qrand() % 2) {
-                qDebug() << "stop timer for msg" << msgId;
+               // qDebug() << "stop timer for msg" << msgId;
                 //1, head, send rumor
                 rumorTimers[msgId]->stop();
                 delete rumorTimers[msgId];
@@ -513,7 +513,7 @@ void Node::receiveBlockReply(const QVariantMap& reply)
     }
     if (metaFileRequests.contains(hashHex)) {
         //receive a metadata
-        qDebug() << "received data hash hex: " << QCA::arrayToHex(hashResult);
+       // qDebug() << "received data hash hex: " << QCA::arrayToHex(hashResult);
         int size = data.size();
         QByteArray ba1 = data.mid(0, 20);
         QByteArray ba2;
@@ -593,12 +593,12 @@ void Node::shareFile(const QString& filepath)
        i++;
    }
 
-   qDebug() << "hash size:" << bhash.size();
+  // qDebug() << "hash size:" << bhash.size();
    QCA::Hash shaHash("sha1");
    shaHash.update(bhash);
    QByteArray hashResult = shaHash.final().toByteArray();
    QString fid = QCA::arrayToHex(hashResult);
-   qDebug() << "Hash result:" << fid;
+  // qDebug() << "Hash result:" << fid;
    metafiles.insertMulti(filename, hashResult);
    metadatas.insert(fid, bhash);
 }
@@ -803,7 +803,7 @@ void Node::processSearchReply(const QVariantMap& reply)
         qDebug() << reply;
         return;
     }
-    qDebug() << reply;
+   // qDebug() << reply;
     QString origin = reply["Origin"].toString();
     QVariantList matchNames = reply["MatchNames"].toList();
     QVariantList matchIds = reply["MatchIDs"].toList();
@@ -829,7 +829,7 @@ void Node::downloadSearchedFile(const QString& fileId)
     QString metadataStr = info[0];
     QString filename = info[1];
     QString origin = info[2];
-    qDebug() << "selected File: " << filename << " from " << origin;
+   // qDebug() << "selected File: " << filename << " from " << origin;
     sendBlockRequest(origin, QCA::hexToArray(metadataStr));
     metaFileRequests[metadataStr] = DOWNLOAD_FILES_DIR + "/" + filename;
 }
@@ -872,7 +872,7 @@ void Node::sendIntimacyReq(const QString &fileId, const QString& publisher)
 void Node::processIntimacyMsg(const QVariantMap& msg)
 {
     qDebug() << "receive intimacy list:";
-    qDebug() << msg;
+   // qDebug() << msg;
     QString fileId = msg["FileID"].toString();
     QMap<QString, QVariant> intimacyList = msg["IntimacyList"].toMap();
     QMap<QString, double> convert;

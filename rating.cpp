@@ -55,6 +55,7 @@ double Rating::getUserRating(const QString &userName, const QString &fileID)
 
 bool Rating::addUserRating(const QString &fileID, const QString &userName, double score)
 {
+    qDebug() << "Rater: " << userName << " filename: " << fileID << " score: " << score;
     if (fileReputation.contains(fileID))
      {
         if (fileReputation.value(fileID).contains(userName))
@@ -67,7 +68,7 @@ bool Rating::addUserRating(const QString &fileID, const QString &userName, doubl
         }
         else
         {
-          fileReputation[fileID].insert(userName, score);
+         fileReputation[fileID].insert(userName, score);
         }
      }
      else
